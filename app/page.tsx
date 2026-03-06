@@ -641,7 +641,6 @@ export default function HomePage() {
                     <iframe 
                       src="//player.bilibili.com/player.html?isOutside=true&aid=113028121035948&bvid=BV1iPs7ehEs3&cid=500001663036289&p=1" 
                       scrolling="no" 
-                      border="0" 
                       frameBorder="no" 
                       framespacing="0" 
                       allowFullScreen={true}
