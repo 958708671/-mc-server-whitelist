@@ -642,7 +642,6 @@ export default function HomePage() {
                       src="//player.bilibili.com/player.html?isOutside=true&aid=113028121035948&bvid=BV1iPs7ehEs3&cid=500001663036289&p=1" 
                       scrolling="no" 
                       frameBorder="no" 
-                      framespacing="0" 
                       allowFullScreen={true}
                       className="w-full h-full"
                       title="云顶之境服务器宣传视频"
