@@ -1,17 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
-import nodemailer from 'nodemailer';
 import { neon } from '@neondatabase/serverless';
 
-// 创建邮件发送器
-const transporter = nodemailer.createTransporter({
-  host: 'smtp.qq.com',
-  port: 465,
-  secure: true,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+// 动态导入nodemailer
+let transporter: any;
+
+async function getTransporter() {
+  if (!transporter) {
+    const nodemailer = await import('nodemailer');
+    transporter = nodemailer.createTransport({
+      host: 'smtp.qq.com',
+      port: 465,
+      secure: true,
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+  }
+  return transporter;
+}
 
 // 初始化数据库连接
 const sql = neon(process.env.DATABASE_URL || '');
@@ -143,7 +150,8 @@ export async function POST(request: NextRequest) {
     `;
 
     // 发送邮件
-    await transporter.sendMail({
+    const mailer = await getTransporter();
+    await mailer.sendMail({
       from: `"云顶之境投诉系统" <${process.env.EMAIL_USER}>`,
       to: process.env.ADMIN_EMAIL,
       subject: `🚨 新的投诉举报 - ${data.targetPlayer}`,
