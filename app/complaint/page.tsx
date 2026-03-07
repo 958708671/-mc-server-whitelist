@@ -1,19 +1,6 @@
 'use client';
 import React, { useState } from 'react';
 
-// 类型定义
-type SubCategory = {
-  name: string;
-  details: string[];
-};
-
-type Category = {
-  name: string;
-  subcategories: Record<string, SubCategory>;
-};
-
-type ViolationTypes = Record<string, Category>;
-
 export default function ComplaintPage() {
   const [formData, setFormData] = useState({
     reporterName: '',
@@ -23,142 +10,39 @@ export default function ComplaintPage() {
     violationMonth: '',
     violationDay: '',
     violationTime: '',
-    violationCategory: '',
-    violationSubCategory: '',
-    violationDetail: '',
+    violationType: '',
     description: '',
     evidence: ''
   });
-  const [useDatePicker, setUseDatePicker] = useState(false); // 切换选择方式
+  const [useDatePicker, setUseDatePicker] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
-  // 违规类型数据结构（三级联动）
-  const violationTypes: ViolationTypes = {
-    building: {
-      name: '🏗️ 建筑与地形',
-      subcategories: {
-        destroy: {
-          name: '恶意破坏',
-          details: ['破坏他人房屋', '破坏公共设施', '故意烧毁建筑', '炸毁他人基地', '破坏红石电路', '破坏农场/牧场']
-        },
-        terrain: {
-          name: '地形改造',
-          details: ['恶意挖空地形', '制造岩浆陷阱', '制造深坑陷阱', '破坏地形美观']
-        },
-        steal: {
-          name: '偷窃行为',
-          details: ['偷窃箱子物品', '偷窃展示框物品', '偷窃盔甲架装备', '偷窃矿车/船只', '偷窃宠物', '偷窃农作物']
-        },
-        occupy: {
-          name: '强占建筑',
-          details: ['强占他人房屋', '在他人家中建造', '堵塞他人通道', '恶意包围他人建筑']
-        }
-      }
-    },
-    cheating: {
-      name: '💻 作弊与外挂',
-      subcategories: {
-        client: {
-          name: '客户端作弊',
-          details: ['使用Xray透视', '使用飞行外挂', '使用加速外挂', '使用杀戮光环', '使用自动点击器', '使用穿墙外挂', '使用无敌外挂', '使用瞬移外挂']
-        },
-        exploit: {
-          name: '漏洞利用',
-          details: ['利用刷物品漏洞', '利用复制漏洞', '利用透视漏洞', '利用伤害漏洞', '利用游戏机制漏洞']
-        },
-        automation: {
-          name: '自动化作弊',
-          details: ['使用挖矿脚本', '使用钓鱼脚本', '使用种植脚本', '使用攻击脚本', '使用移动脚本', '使用建造脚本']
-        }
-      }
-    },
-    pvp: {
-      name: '⚔️ PVP与战斗',
-      subcategories: {
-        kill: {
-          name: '恶意击杀玩家',
-          details: ['恶意击杀其他玩家', '恶意攻击其他玩家', '恶意追杀其他玩家', '恶意堵截其他玩家']
-        },
-        abuse: {
-          name: '战斗滥用',
-          details: ['利用游戏机制击杀', '恶意卡位', '恶意消耗']
-        }
-      }
-    },
-    behavior: {
-      name: '👤 玩家行为',
-      subcategories: {
-        harassment: {
-          name: '骚扰行为',
-          details: ['言语骚扰', '跟踪骚扰', '恶意打扰', '持续攻击', '恶意举报', '造谣诽谤']
-        },
-        threat: {
-          name: '威胁恐吓',
-          details: ['威胁人身安全', '威胁破坏建筑', '威胁盗取账号', '威胁泄露信息', '威胁踢出服务器']
-        },
-        scam: {
-          name: '诈骗欺诈',
-          details: ['交易诈骗', '装备诈骗', '虚假承诺', '冒充他人诈骗', '钓鱼链接']
-        },
-        impersonation: {
-          name: '冒充行为',
-          details: ['冒充管理员', '冒充服主', '冒充其他玩家', '冒充官方人员', '使用相似ID']
-        }
-      }
-    },
-    chat: {
-      name: '💬 聊天与言论',
-      subcategories: {
-        spam: {
-          name: '刷屏行为',
-          details: ['重复发言刷屏', '无意义刷屏', '大段文字刷屏', '快速连续发言', '使用宏刷屏']
-        },
-        advertising: {
-          name: '广告推广',
-          details: ['宣传其他服务器', '发送广告链接', '推广QQ群/微信群', '推广Discord', '推广商业内容']
-        },
-        inappropriate: {
-          name: '不当言论',
-          details: ['辱骂他人', '人身攻击', '歧视言论', '政治敏感', '色情内容', '暴力内容', '恶意引战']
-        },
-        leak: {
-          name: '信息泄露',
-          details: ['泄露他人隐私', '泄露他人信息', '公开他人IP', '公开他人地址', '公开他人电话']
-        }
-      }
-    },
-    account: {
-      name: '🔐 账号安全',
-      subcategories: {
-        theft: {
-          name: '账号盗取',
-          details: ['盗取他人账号', '尝试破解密码', '社工欺骗', '木马盗号']
-        },
-        ban: {
-          name: '规避封禁',
-          details: ['使用小号', '更换IP规避', '使用VPN规避', '冒用他人身份']
-        }
-      }
-    },
-    other: {
-      name: '📌 其他违规',
-      subcategories: {
-        lag: {
-          name: '制造卡顿',
-          details: ['制造大量实体', '制造红石卡顿', '恶意放置方块', '制造粒子效果', '故意造成延迟']
-        },
-        abuse: {
-          name: '权限滥用',
-          details: ['滥用管理员权限', '滥用传送权限', '滥用创造模式']
-        },
-        other: {
-          name: '其他行为',
-          details: ['恶意举报', '虚假举报', '恶意投诉', '破坏游戏规则', '其他违规行为']
-        }
-      }
-    }
-  };
+  // 所有违规类型（扁平化列表）
+  const violationTypes = [
+    '破坏他人房屋', '破坏公共设施', '故意烧毁建筑', '炸毁他人基地', '破坏红石电路', '破坏农场/牧场',
+    '恶意挖空地形', '制造岩浆陷阱', '制造深坑陷阱', '破坏地形美观',
+    '偷窃箱子物品', '偷窃展示框物品', '偷窃盔甲架装备', '偷窃矿车/船只', '偷窃宠物', '偷窃农作物',
+    '强占他人房屋', '在他人家中建造', '堵塞他人通道', '恶意包围他人建筑',
+    '使用Xray透视', '使用飞行外挂', '使用加速外挂', '使用杀戮光环', '使用自动点击器', '使用穿墙外挂', '使用无敌外挂', '使用瞬移外挂',
+    '利用刷物品漏洞', '利用复制漏洞', '利用透视漏洞', '利用伤害漏洞', '利用游戏机制漏洞',
+    '使用挖矿脚本', '使用钓鱼脚本', '使用种植脚本', '使用攻击脚本', '使用移动脚本', '使用建造脚本',
+    '恶意击杀其他玩家', '恶意攻击其他玩家', '恶意追杀其他玩家', '恶意堵截其他玩家',
+    '利用游戏机制击杀', '恶意卡位', '恶意消耗',
+    '言语骚扰', '跟踪骚扰', '恶意打扰', '持续攻击', '恶意举报', '造谣诽谤',
+    '威胁人身安全', '威胁破坏建筑', '威胁盗取账号', '威胁泄露信息', '威胁踢出服务器',
+    '交易诈骗', '装备诈骗', '虚假承诺', '冒充他人诈骗', '钓鱼链接',
+    '冒充管理员', '冒充服主', '冒充其他玩家', '冒充官方人员', '使用相似ID',
+    '重复发言刷屏', '无意义刷屏', '大段文字刷屏', '快速连续发言', '使用宏刷屏',
+    '宣传其他服务器', '发送广告链接', '推广QQ群/微信群', '推广Discord', '推广商业内容',
+    '辱骂他人', '人身攻击', '歧视言论', '政治敏感', '色情内容', '暴力内容', '恶意引战',
+    '泄露他人隐私', '泄露他人信息', '公开他人IP', '公开他人地址', '公开他人电话',
+    '盗取他人账号', '尝试破解密码', '社工欺骗', '木马盗号',
+    '使用小号', '更换IP规避', '使用VPN规避', '冒用他人身份',
+    '制造大量实体', '制造红石卡顿', '恶意放置方块', '制造粒子效果', '故意造成延迟',
+    '滥用管理员权限', '滥用传送权限', '滥用创造模式',
+    '虚假举报', '恶意投诉', '破坏游戏规则', '其他违规行为'
+  ];
 
   // 获取某年某月的天数
   const getDaysInMonth = (year: string, month: string) => {
@@ -185,17 +69,6 @@ export default function ComplaintPage() {
       // 如果年份或月份改变，重置日期
       if (name === 'violationYear' || name === 'violationMonth') {
         newData.violationDay = '';
-      }
-      
-      // 如果违规大类改变，重置中类和小类
-      if (name === 'violationCategory') {
-        newData.violationSubCategory = '';
-        newData.violationDetail = '';
-      }
-      
-      // 如果违规中类改变，重置小类
-      if (name === 'violationSubCategory') {
-        newData.violationDetail = '';
       }
       
       return newData;
@@ -229,9 +102,7 @@ export default function ComplaintPage() {
           violationMonth: '',
           violationDay: '',
           violationTime: '',
-          violationCategory: '',
-          violationSubCategory: '',
-          violationDetail: '',
+          violationType: '',
           description: '',
           evidence: ''
         });
@@ -298,34 +169,41 @@ export default function ComplaintPage() {
                   value={formData.reporterName}
                   onChange={handleChange}
                   required
+                  pattern="[a-zA-Z0-9_]+"
+                  title="游戏ID只能包含英文字母、数字和下划线"
                   className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 transition-colors"
-                  placeholder="请输入您的游戏ID"
+                  placeholder="请输入您的游戏ID（仅限英文、数字、下划线）"
                 />
               </div>
               <div>
-                <label className="block text-gray-300 mb-2">您的QQ号 <span className="text-gray-500">(可选)</span></label>
+                <label className="block text-gray-300 mb-2">您的QQ号 <span className="text-red-400">*</span></label>
                 <input
                   type="text"
                   name="reporterQQ"
                   value={formData.reporterQQ}
                   onChange={handleChange}
+                  required
+                  pattern="[1-9][0-9]{4,10}"
+                  title="请输入正确的QQ号（5-11位数字）"
                   className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 transition-colors"
-                  placeholder="方便我们联系您"
+                  placeholder="请输入您的QQ号"
                 />
               </div>
             </div>
 
             {/* 被举报人信息 */}
             <div>
-              <label className="block text-gray-300 mb-2">违规玩家ID <span className="text-red-400">*</span></label>
+              <label className="block text-gray-300 mb-2">违规玩家游戏ID <span className="text-red-400">*</span></label>
               <input
                 type="text"
                 name="targetPlayer"
                 value={formData.targetPlayer}
                 onChange={handleChange}
                 required
+                pattern="[a-zA-Z0-9_]+"
+                title="游戏ID只能包含英文字母、数字和下划线"
                 className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 transition-colors"
-                placeholder="请输入违规玩家的游戏ID"
+                placeholder="请输入违规玩家的游戏ID（仅限英文、数字、下划线）"
               />
             </div>
 
@@ -405,56 +283,21 @@ export default function ComplaintPage() {
               )}
             </div>
 
-            {/* 违规类型 - 三级联动 */}
+            {/* 违规类型 */}
             <div>
               <label className="block text-gray-300 mb-2">违规类型 <span className="text-red-400">*</span></label>
-              <div className="space-y-3">
-                {/* 第一级：大类 */}
-                <select
-                  name="violationCategory"
-                  value={formData.violationCategory}
-                  onChange={handleChange}
-                  required
-                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors"
-                >
-                  <option value="">请选择违规大类</option>
-                  {Object.entries(violationTypes).map(([key, value]) => (
-                    <option key={key} value={key}>{value.name}</option>
-                  ))}
-                </select>
-
-                {/* 第二级：中类 */}
-                {formData.violationCategory && (
-                  <select
-                    name="violationSubCategory"
-                    value={formData.violationSubCategory}
-                    onChange={handleChange}
-                    required
-                    className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors"
-                  >
-                    <option value="">请选择违规中类</option>
-                    {Object.entries(violationTypes[formData.violationCategory]?.subcategories || {}).map(([key, value]) => (
-                      <option key={key} value={key}>{value.name}</option>
-                    ))}
-                  </select>
-                )}
-
-                {/* 第三级：小类/详细 */}
-                {formData.violationCategory && formData.violationSubCategory && (
-                  <select
-                    name="violationDetail"
-                    value={formData.violationDetail}
-                    onChange={handleChange}
-                    required
-                    className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors"
-                  >
-                    <option value="">请选择具体违规行为</option>
-                    {violationTypes[formData.violationCategory]?.subcategories[formData.violationSubCategory]?.details?.map((detail: string, index: number) => (
-                      <option key={index} value={detail}>{detail}</option>
-                    ))}
-                  </select>
-                )}
-              </div>
+              <select
+                name="violationType"
+                value={formData.violationType}
+                onChange={handleChange}
+                required
+                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors"
+              >
+                <option value="">请选择违规类型</option>
+                {violationTypes.map((type, index) => (
+                  <option key={index} value={type}>{type}</option>
+                ))}
+              </select>
             </div>
 
             {/* 违规描述 */}

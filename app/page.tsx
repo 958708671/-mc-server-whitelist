@@ -466,6 +466,62 @@ export default function HomePage() {
   const mainContainerRef = useRef<HTMLDivElement>(null);
   const sectionsRef = useRef<HTMLElement[]>([]);
   
+  // 管理员登录相关状态
+  const [logoClickCount, setLogoClickCount] = useState(0);
+  const [showAdminLogin, setShowAdminLogin] = useState(false);
+  const [adminLoggedIn, setAdminLoggedIn] = useState(false);
+  const [adminUser, setAdminUser] = useState<string | null>(null);
+  const [adminId, setAdminId] = useState<number | null>(null);
+  const [loginForm, setLoginForm] = useState({ username: '', password: '' });
+  const [loginError, setLoginError] = useState('');
+  
+  // Logo点击处理 - 连续点击5次显示登录弹窗
+  const handleLogoClick = () => {
+    const newCount = logoClickCount + 1;
+    setLogoClickCount(newCount);
+    
+    if (newCount >= 5) {
+      setShowAdminLogin(true);
+      setLogoClickCount(0);
+    }
+    
+    // 3秒后重置计数
+    setTimeout(() => setLogoClickCount(0), 3000);
+  };
+  
+  // 管理员登录
+  const handleAdminLogin = async () => {
+    try {
+      const response = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(loginForm),
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        setAdminLoggedIn(true);
+        setAdminUser(result.user);
+        setAdminId(result.adminId);
+        setShowAdminLogin(false);
+        setLoginForm({ username: '', password: '' });
+        setLoginError('');
+      } else {
+        setLoginError(result.message || '登录失败');
+      }
+    } catch (error) {
+      setLoginError('登录失败，请稍后重试');
+    }
+  };
+  
+  // 管理员登出
+  const handleAdminLogout = () => {
+    setAdminLoggedIn(false);
+    setAdminUser(null);
+    setAdminId(null);
+  };
+  
   // 简单的滚动监听，只更新当前section指示器
   useEffect(() => {
     const handleScroll = () => {
@@ -622,7 +678,10 @@ export default function HomePage() {
       <nav className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-md border-b border-gray-800">
         <div className="container mx-auto px-6 py-4">
           <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-2">
+            <div 
+              className="flex items-center space-x-2 cursor-pointer select-none"
+              onClick={handleLogoClick}
+            >
               <div className="text-xl font-bold text-blue-400">CT Cloud tops</div>
               <div className="text-xl font-bold text-white">云顶之境</div>
             </div>
@@ -657,6 +716,24 @@ export default function HomePage() {
               >
                 申请白名单
               </button>
+              {adminLoggedIn ? (
+                <>
+                  <a 
+                    href={`/admin/complaints?adminId=${adminId}&adminName=${encodeURIComponent(adminUser || '')}`}
+                    className="text-green-400 hover:text-green-300 text-sm transition-colors duration-300"
+                  >
+                    管理后台
+                  </a>
+                  <span className="text-gray-500 text-sm">|</span>
+                  <span className="text-gray-400 text-sm">{adminUser}</span>
+                  <button 
+                    onClick={handleAdminLogout}
+                    className="text-red-400 hover:text-red-300 text-sm transition-colors duration-300"
+                  >
+                    登出
+                  </button>
+                </>
+              ) : null}
             </div>
           </div>
         </div>
@@ -1055,6 +1132,64 @@ export default function HomePage() {
 
       {/* 联系管理弹窗 */}
       <ContactAdminModal isOpen={showContactModal} onClose={() => setShowContactModal(false)} />
+
+      {/* 管理员登录弹窗 */}
+      {showAdminLogin && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="bg-gray-900 border border-gray-700 rounded-xl p-8 w-full max-w-md mx-4 shadow-2xl">
+            <h3 className="text-2xl font-bold text-white mb-6 text-center">管理员登录</h3>
+            
+            {loginError && (
+              <div className="bg-red-500/20 border border-red-500/50 text-red-400 px-4 py-2 rounded-lg mb-4 text-center">
+                {loginError}
+              </div>
+            )}
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-gray-300 mb-2">用户名</label>
+                <input
+                  type="text"
+                  value={loginForm.username}
+                  onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
+                  className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500"
+                  placeholder="请输入用户名"
+                />
+              </div>
+              <div>
+                <label className="block text-gray-300 mb-2">密码</label>
+                <input
+                  type="password"
+                  value={loginForm.password}
+                  onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                  className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500"
+                  placeholder="请输入密码"
+                  onKeyDown={(e) => e.key === 'Enter' && handleAdminLogin()}
+                />
+              </div>
+            </div>
+            
+            <div className="flex space-x-4 mt-6">
+              <button
+                onClick={() => {
+                  setShowAdminLogin(false);
+                  setLoginForm({ username: '', password: '' });
+                  setLoginError('');
+                }}
+                className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-3 rounded-lg transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleAdminLogin}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg transition-colors"
+              >
+                登录
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
 
     </div>

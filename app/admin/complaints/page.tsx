@@ -19,6 +19,23 @@ export default function AdminComplaintsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
+  
+  // 从URL获取管理员信息
+  const [adminInfo, setAdminInfo] = useState<{ id: number; name: string } | null>(null);
+  
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const adminId = params.get('adminId');
+    const adminName = params.get('adminName');
+    
+    if (adminId && adminName) {
+      setAdminInfo({ id: parseInt(adminId), name: adminName });
+    } else {
+      // 如果没有管理员信息，跳转回首页
+      alert('请先登录');
+      window.location.href = '/';
+    }
+  }, []);
 
   // 获取投诉列表
   const fetchComplaints = async () => {
@@ -45,7 +62,11 @@ export default function AdminComplaintsPage() {
       const response = await fetch(`/api/complaints/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ 
+          status,
+          adminId: adminInfo?.id,
+          adminName: adminInfo?.name
+        }),
       });
       
       if (response.ok) {
@@ -64,7 +85,7 @@ export default function AdminComplaintsPage() {
     if (!confirm('确定要删除这条投诉吗？')) return;
     
     try {
-      const response = await fetch(`/api/complaints/${id}`, {
+      const response = await fetch(`/api/complaints/${id}?adminId=${adminInfo?.id}&adminName=${encodeURIComponent(adminInfo?.name || '')}`, {
         method: 'DELETE',
       });
       

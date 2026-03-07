@@ -27,9 +27,6 @@ export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
     
-    // 构建违规类型字符串
-    const violationType = `${data.violationCategory} > ${data.violationSubCategory} > ${data.violationDetail}`;
-    
     // 构建违规时间字符串
     let violationTime = '未填写';
     if (data.violationYear && data.violationMonth && data.violationDay) {
@@ -56,7 +53,7 @@ export async function POST(request: NextRequest) {
           ${data.reporterQQ},
           ${data.targetPlayer},
           ${violationTime},
-          ${violationType},
+          ${data.violationType},
           ${data.description},
           ${data.evidence || ''},
           'pending',
@@ -123,7 +120,7 @@ export async function POST(request: NextRequest) {
       
       <div class="field">
         <div class="field-label">违规类型</div>
-        <div class="field-value">${violationType}</div>
+        <div class="field-value">${data.violationType}</div>
       </div>
       
       <div class="field">
