@@ -1,6 +1,19 @@
 'use client';
 import React, { useState } from 'react';
 
+// 类型定义
+type SubCategory = {
+  name: string;
+  details: string[];
+};
+
+type Category = {
+  name: string;
+  subcategories: Record<string, SubCategory>;
+};
+
+type ViolationTypes = Record<string, Category>;
+
 export default function ComplaintPage() {
   const [formData, setFormData] = useState({
     reporterName: '',
@@ -21,7 +34,7 @@ export default function ComplaintPage() {
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
   // 违规类型数据结构（三级联动）
-  const violationTypes = {
+  const violationTypes: ViolationTypes = {
     building: {
       name: '🏗️ 建筑与地形',
       subcategories: {
@@ -420,7 +433,7 @@ export default function ComplaintPage() {
                     className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors"
                   >
                     <option value="">请选择违规中类</option>
-                    {Object.entries(violationTypes[formData.violationCategory as keyof typeof violationTypes].subcategories).map(([key, value]) => (
+                    {Object.entries(violationTypes[formData.violationCategory]?.subcategories || {}).map(([key, value]) => (
                       <option key={key} value={key}>{value.name}</option>
                     ))}
                   </select>
@@ -436,7 +449,7 @@ export default function ComplaintPage() {
                     className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors"
                   >
                     <option value="">请选择具体违规行为</option>
-                    {violationTypes[formData.violationCategory as keyof typeof violationTypes].subcategories[formData.violationSubCategory as keyof typeof violationTypes.building.subcategories].details.map((detail, index) => (
+                    {violationTypes[formData.violationCategory]?.subcategories[formData.violationSubCategory]?.details?.map((detail: string, index: number) => (
                       <option key={index} value={detail}>{detail}</option>
                     ))}
                   </select>
