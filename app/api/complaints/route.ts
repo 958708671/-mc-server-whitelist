@@ -9,15 +9,13 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
     
-    let query = 'SELECT * FROM complaints ORDER BY created_at DESC';
-    let params: any[] = [];
+    let complaints;
     
     if (status && status !== 'all') {
-      query = 'SELECT * FROM complaints WHERE status = $1 ORDER BY created_at DESC';
-      params = [status];
+      complaints = await sql`SELECT * FROM complaints WHERE status = ${status} ORDER BY created_at DESC`;
+    } else {
+      complaints = await sql`SELECT * FROM complaints ORDER BY created_at DESC`;
     }
-    
-    const complaints = await sql(query, params);
     
     return NextResponse.json({ 
       success: true, 
