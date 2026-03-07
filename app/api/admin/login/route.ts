@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 
-const sql = neon(process.env.DATABASE_URL || '');
+// 获取数据库连接
+const getSql = () => {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    throw new Error('DATABASE_URL not set');
+  }
+  return neon(databaseUrl);
+};
 
+// 管理员登录接口
 export async function POST(request: NextRequest) {
   try {
     const { username, password } = await request.json();
@@ -13,6 +21,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    
+    const sql = getSql();
     
     // 查询管理员
     const admins = await sql`
@@ -31,7 +41,8 @@ export async function POST(request: NextRequest) {
     
     // 记录登录日志
     try {
-      await sql`
+      const sqlLog = getSql();
+      await sqlLog`
         INSERT INTO admin_logs (admin_id, action, details, created_at)
         VALUES (${admin.id}, 'login', '管理员登录', NOW())
       `;
