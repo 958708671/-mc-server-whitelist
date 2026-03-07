@@ -492,13 +492,16 @@ export default function HomePage() {
   // 管理员登录
   const handleAdminLogin = async () => {
     try {
+      console.log('发送登录请求:', loginForm);
       const response = await fetch('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(loginForm),
       });
       
+      console.log('响应状态:', response.status);
       const result = await response.json();
+      console.log('响应结果:', result);
       
       if (result.success) {
         setAdminLoggedIn(true);
@@ -510,8 +513,9 @@ export default function HomePage() {
       } else {
         setLoginError(result.message || '登录失败');
       }
-    } catch (error) {
-      setLoginError('登录失败，请稍后重试');
+    } catch (error: any) {
+      console.error('登录请求失败:', error);
+      setLoginError('登录失败: ' + (error.message || '网络错误'));
     }
   };
   

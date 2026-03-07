@@ -47,10 +47,10 @@ export async function POST(request: NextRequest) {
       isOwner: admin.is_owner
     });
     
-  } catch (error) {
+  } catch (error: any) {
     console.error('登录失败:', error);
     return NextResponse.json(
-      { success: false, message: '登录失败，请稍后重试' },
+      { success: false, message: '登录失败: ' + (error.message || '未知错误') },
       { status: 500 }
     );
   }
