@@ -464,7 +464,7 @@ export default function HomePage() {
     bg3: false
   });
   const mainContainerRef = useRef<HTMLDivElement>(null);
-  const sectionsRef = useRef<HTMLDivElement[]>([]);
+  const sectionsRef = useRef<HTMLElement[]>([]);
   
   // 简单的滚动监听，只更新当前section指示器
   useEffect(() => {
