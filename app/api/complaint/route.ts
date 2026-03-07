@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import * as nodemailer from 'nodemailer';
+import nodemailer from 'nodemailer';
 import { neon } from '@neondatabase/serverless';
 
 // 创建邮件发送器
-const transporter = (nodemailer as any).createTransporter({
+const transporter = nodemailer.createTransporter({
   host: 'smtp.qq.com',
   port: 465,
   secure: true,
