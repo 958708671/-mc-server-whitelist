@@ -6,10 +6,10 @@ const sql = neon(process.env.DATABASE_URL || '');
 // 更新投诉状态
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const { status } = await request.json();
     
     // 验证状态值
@@ -44,10 +44,10 @@ export async function PATCH(
 // 删除投诉
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     
     await sql`DELETE FROM complaints WHERE id = ${id}`;
     
