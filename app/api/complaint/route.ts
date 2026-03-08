@@ -27,6 +27,14 @@ export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
     
+    // 验证必填字段
+    if (!data.reporterName || !data.reporterQQ || !data.targetPlayer || !data.violationType || !data.description) {
+      return NextResponse.json(
+        { success: false, message: '请填写所有必填字段' },
+        { status: 400 }
+      );
+    }
+    
     // 构建违规时间字符串
     let violationTime = '未填写';
     if (data.violationYear && data.violationMonth && data.violationDay) {
@@ -60,13 +68,17 @@ export async function POST(request: NextRequest) {
           NOW()
         )
       `;
+      console.log('数据库保存成功');
     } catch (dbError) {
       console.error('数据库保存失败:', dbError);
-      // 数据库失败不影响邮件发送
+      // 数据库失败不影响继续处理
     }
 
-    // 构建邮件内容
-    const mailContent = `
+    // 尝试发送邮件（非必需）
+    try {
+      const mailer = await getTransporter();
+      // 构建邮件内容
+      const mailContent = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -144,26 +156,29 @@ export async function POST(request: NextRequest) {
   </div>
 </body>
 </html>
-    `;
-
-    // 发送邮件
-    const mailer = await getTransporter();
-    await mailer.sendMail({
-      from: `"云顶之境投诉系统" <${process.env.EMAIL_USER}>`,
-      to: process.env.ADMIN_EMAIL,
-      subject: `🚨 新的投诉举报 - ${data.targetPlayer}`,
-      html: mailContent,
-    });
+      `;
+      
+      await mailer.sendMail({
+        from: `"云顶之境投诉系统" <${process.env.EMAIL_USER}>`,
+        to: process.env.ADMIN_EMAIL,
+        subject: `🚨 新的投诉举报 - ${data.targetPlayer}`,
+        html: mailContent,
+      });
+      console.log('邮件发送成功');
+    } catch (mailError) {
+      console.error('邮件发送失败:', mailError);
+      // 邮件失败不影响整个请求的成功
+    }
 
     return NextResponse.json({ 
       success: true, 
-      message: '投诉提交成功，管理员已收到通知' 
+      message: '投诉提交成功！我们会尽快处理。' 
     });
 
   } catch (error) {
     console.error('投诉提交失败:', error);
     return NextResponse.json(
-      { success: false, message: '提交失败，请稍后重试' },
+      { success: false, message: '提交失败，请稍后重试或联系管理员' },
       { status: 500 }
     );
   }

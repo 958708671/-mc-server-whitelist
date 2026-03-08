@@ -10,10 +10,27 @@ const getSql = () => {
   return neon(databaseUrl);
 };
 
+// 获取客户端IP地址
+const getClientIP = (request: NextRequest): string => {
+  const forwarded = request.headers.get('x-forwarded-for');
+  const realIP = request.headers.get('x-real-ip');
+  
+  if (forwarded) {
+    return forwarded.split(',')[0].trim();
+  }
+  
+  if (realIP) {
+    return realIP;
+  }
+  
+  return 'unknown';
+};
+
 // 管理员登录接口
 export async function POST(request: NextRequest) {
   try {
     const { username, password } = await request.json();
+    const clientIP = getClientIP(request);
     
     if (!username || !password) {
       return NextResponse.json(
@@ -39,12 +56,18 @@ export async function POST(request: NextRequest) {
     
     const admin = admins[0];
     
-    // 记录登录日志
+    // 记录登录日志（包含IP地址）
     try {
       const sqlLog = getSql();
+      const roleText = admin.is_owner ? '服主' : '管理员';
+      // 如果 display_name 已经包含角色信息，只使用 display_name
+      const displayName = admin.display_name || admin.username;
+      const details = displayName === roleText 
+        ? `${displayName} 登录成功`
+        : `${roleText} ${displayName} 登录成功`;
       await sqlLog`
-        INSERT INTO admin_logs (admin_id, action, details, created_at)
-        VALUES (${admin.id}, 'login', '管理员登录', NOW())
+        INSERT INTO admin_logs (admin_id, action, details, ip_address, created_at)
+        VALUES (${admin.id}, 'login', ${details}, ${clientIP}, NOW())
       `;
     } catch (logError) {
       console.error('记录登录日志失败:', logError);
