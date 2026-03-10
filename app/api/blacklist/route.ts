@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sql, { withRetry } from '@/lib/db';
-import { shouldUseMockDb } from '@/lib/mock-db';
 
 let Rcon: any = null;
 try {
@@ -8,22 +7,6 @@ try {
 } catch (e) {
   console.log('rcon-client 加载失败，IP封禁功能将不可用');
 }
-
-interface MockBlacklistEntry {
-  id: number;
-  minecraft_id: string;
-  ip_address: string | null;
-  reason: string;
-  banned_by: string;
-  banned_by_id: number | null;
-  is_permanent: boolean;
-  duration_minutes: number | null;
-  expires_at: string | null;
-  is_active: boolean;
-  created_at: string;
-}
-
-let mockBlacklist: MockBlacklistEntry[] = [];
 
 const query = async (text: string, params: any[] = []) => {
   return withRetry(async () => {
@@ -106,41 +89,6 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '20');
     const includeInactive = searchParams.get('includeInactive') === 'true';
     const offset = (page - 1) * limit;
-
-    const useMockDb = shouldUseMockDb();
-    console.log('[Blacklist API] useMockDb:', useMockDb);
-    
-    if (useMockDb) {
-      console.log('[Blacklist API] 使用模拟数据库');
-      let filteredList = mockBlacklist;
-      
-      if (!includeInactive) {
-        filteredList = mockBlacklist.filter((entry: MockBlacklistEntry) => entry.is_active);
-      }
-      
-      if (search) {
-        filteredList = filteredList.filter((entry: MockBlacklistEntry) => 
-          entry.minecraft_id.toLowerCase().includes(search.toLowerCase()) ||
-          (entry.ip_address && entry.ip_address.includes(search))
-        );
-      }
-      
-      const total = filteredList.length;
-      const entries = filteredList.slice(offset, offset + limit);
-      
-      return NextResponse.json({
-        success: true,
-        entries,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages: Math.ceil(total / limit)
-        }
-      });
-    }
-
-    console.log('[Blacklist API] 使用真实数据库');
     try {
       let queryStr = 'SELECT * FROM blacklist';
       let countSql = 'SELECT COUNT(*) FROM blacklist';
@@ -232,37 +180,6 @@ export async function POST(request: NextRequest) {
     const durationMinutes = isPermanent ? null : (duration ? parseInt(duration) : 1440);
     const expiresAt = isPermanent ? null : new Date(Date.now() + (durationMinutes || 1440) * 60 * 1000).toISOString();
 
-    if (shouldUseMockDb()) {
-      if (mockBlacklist.some((e: MockBlacklistEntry) => e.minecraft_id === minecraft_id && e.is_active)) {
-        return NextResponse.json({
-          success: false,
-          message: '该玩家已在黑名单中'
-        }, { status: 400 });
-      }
-
-      mockBlacklist.push({
-        id: mockBlacklist.length + 1,
-        minecraft_id,
-        ip_address,
-        reason,
-        banned_by,
-        banned_by_id,
-        is_permanent: isPermanent,
-        duration_minutes: durationMinutes,
-        expires_at: expiresAt,
-        is_active: true,
-        created_at: new Date().toISOString()
-      });
-
-      return NextResponse.json({
-        success: true,
-        message: '已添加到黑名单（模拟模式）',
-        banResult: { success: true, message: '模拟模式，未执行真实封禁' },
-        expires_at: expiresAt,
-        is_permanent: isPermanent
-      });
-    }
-
     const checkResult = await query(
       'SELECT id FROM blacklist WHERE minecraft_id = $1 AND is_active = TRUE',
       [minecraft_id]
@@ -339,31 +256,6 @@ export async function DELETE(request: NextRequest) {
         success: false,
         message: '缺少黑名单ID'
       }, { status: 400 });
-    }
-
-    if (shouldUseMockDb()) {
-      const index = mockBlacklist.findIndex((e: MockBlacklistEntry) => e.id === parseInt(id));
-      if (index === -1) {
-        return NextResponse.json({
-          success: false,
-          message: '黑名单记录不存在'
-        }, { status: 404 });
-      }
-
-      if (action === 'revoke') {
-        mockBlacklist[index].is_active = false;
-        return NextResponse.json({
-          success: true,
-          message: '已撤回，用户回到待审核状态（模拟模式）'
-        });
-      }
-
-      mockBlacklist.splice(index, 1);
-
-      return NextResponse.json({
-        success: true,
-        message: '已从黑名单移除（模拟模式）'
-      });
     }
 
     const entryResult = await query(

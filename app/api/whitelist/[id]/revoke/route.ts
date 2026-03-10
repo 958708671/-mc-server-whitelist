@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sql, { withRetry } from '@/lib/db';
-import { mockSql, mockApplications } from '@/lib/mock-db';
 import { exec } from 'child_process';
 import path from 'path';
 import { Rcon } from 'rcon-client';
@@ -112,22 +111,13 @@ export async function POST(
     const { id } = await params;
     
     let applicationResult: any[] = [];
-    let useMockDb = false;
     
-    try {
-      applicationResult = await withRetry(async () => {
-        return await sql`
-          SELECT minecraft_id, ip_address FROM whitelist_applications WHERE id = ${parseInt(id)}
-        `;
-      });
-    } catch (dbError) {
-      console.log('真实数据库连接失败，使用模拟数据库');
-      useMockDb = true;
-      applicationResult = await mockSql.query(
-        'SELECT minecraft_id, ip_address FROM whitelist_applications WHERE id = ?',
-        [parseInt(id)]
-      );
-    }
+    // 查询申请信息
+    applicationResult = await withRetry(async () => {
+      return await sql`
+        SELECT minecraft_id, ip_address FROM whitelist_applications WHERE id = ${parseInt(id)}
+      `;
+    });
     
     if (applicationResult.length === 0) {
       return NextResponse.json(
@@ -141,7 +131,7 @@ export async function POST(
     
     // 检查该玩家是否在黑名单中，如果在则解封IP
     let unbanResult = null;
-    if (!useMockDb && ipAddress) {
+    if (ipAddress) {
       try {
         const blacklistResult = await withRetry(async () => {
           return await sql`
@@ -174,34 +164,18 @@ export async function POST(
       }
     }
     
-    if (!useMockDb) {
-      await withRetry(async () => {
-        return await sql`
-          UPDATE whitelist_applications 
-          SET status = 'pending', 
-              reviewed_by = NULL, 
-              reviewed_by_id = NULL,
-              review_note = NULL,
-              reviewed_at = NULL
-          WHERE id = ${parseInt(id)}
-        `;
-      });
-    } else {
-      // 直接更新模拟数据
-      const app = mockApplications.find(a => a.id === parseInt(id));
-      if (app) {
-        app.status = 'pending';
-        app.reviewed_by = null;
-        app.reviewed_by_id = null;
-        app.review_note = null;
-        app.reviewed_at = null;
-        console.log('[Mock DB] 直接更新申请状态为 pending:', app);
-      }
-      await mockSql.query(
-        'UPDATE whitelist_applications SET status = ? WHERE id = ?',
-        ['pending', parseInt(id)]
-      );
-    }
+    // 更新申请状态为待审核
+    await withRetry(async () => {
+      return await sql`
+        UPDATE whitelist_applications 
+        SET status = 'pending', 
+            reviewed_by = NULL, 
+            reviewed_by_id = NULL,
+            review_note = NULL,
+            reviewed_at = NULL
+        WHERE id = ${parseInt(id)}
+      `;
+    });
     
     let settings: Record<string, string> = {
       rcon_host: '127.0.0.1',

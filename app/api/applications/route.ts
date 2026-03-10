@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sql, { withRetry } from '@/lib/db';
-import { mockApplications, shouldUseMockDb } from '@/lib/mock-db';
 import { notifyAdminsNewApplication } from '@/lib/qq-bot';
 
 // 动态导入nodemailer
@@ -27,48 +26,29 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
     const adminId = searchParams.get('adminId');
-    const useMockDb = shouldUseMockDb();
     
-    let applications;
-    if (useMockDb) {
+    const applications = await withRetry(async () => {
       if (status === 'pending') {
-        applications = mockApplications
-          .filter(a => a.status === 'pending')
-          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        return await sql`
+          SELECT * FROM whitelist_applications 
+          WHERE status = 'pending'
+          ORDER BY created_at DESC
+        `;
       } else if (adminId) {
-        applications = mockApplications
-          .filter(a => a.reviewed_by_id === parseInt(adminId))
-          .sort((a, b) => new Date(b.reviewed_at || b.created_at).getTime() - new Date(a.reviewed_at || a.created_at).getTime())
-          .slice(0, 50);
+        return await sql`
+          SELECT * FROM whitelist_applications 
+          WHERE reviewed_by_id = ${parseInt(adminId)}
+          ORDER BY reviewed_at DESC
+          LIMIT 50
+        `;
       } else {
-        applications = mockApplications
-          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-          .slice(0, 100);
+        return await sql`
+          SELECT * FROM whitelist_applications 
+          ORDER BY created_at DESC
+          LIMIT 100
+        `;
       }
-    } else {
-      applications = await withRetry(async () => {
-        if (status === 'pending') {
-          return await sql`
-            SELECT * FROM whitelist_applications 
-            WHERE status = 'pending'
-            ORDER BY created_at DESC
-          `;
-        } else if (adminId) {
-          return await sql`
-            SELECT * FROM whitelist_applications 
-            WHERE reviewed_by_id = ${parseInt(adminId)}
-            ORDER BY reviewed_at DESC
-            LIMIT 50
-          `;
-        } else {
-          return await sql`
-            SELECT * FROM whitelist_applications 
-            ORDER BY created_at DESC
-            LIMIT 100
-          `;
-        }
-      });
-    }
+    });
     
     return NextResponse.json({
       success: true,

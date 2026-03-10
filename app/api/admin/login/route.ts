@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sql, { withRetry } from '@/lib/db';
-import { mockSql } from '@/lib/mock-db';
 
 // 获取客户端IP地址
 const getClientIP = (request: NextRequest): string => {
@@ -31,27 +30,13 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    let admins: any[] = [];
-    let useMockDb = false;
-    
-    // 尝试连接真实数据库
-    try {
-      // 查询管理员 - 支持用 username 或 qq 登录（使用重试机制）
-      admins = await withRetry(async () => {
-        return await sql`
-          SELECT id, username, display_name, qq, is_owner FROM admins 
-          WHERE (username = ${username} OR qq = ${username}) AND password = ${password}
-        `;
-      });
-    } catch (dbError) {
-      console.log('真实数据库连接失败，切换到模拟数据库:', dbError);
-      useMockDb = true;
-      // 使用模拟数据库
-      admins = await mockSql.query(
-        'SELECT id, username, display_name, qq, is_owner FROM admins WHERE (username = $1 OR qq = $1) AND password = $2',
-        [username, password]
-      );
-    }
+    // 查询管理员 - 支持用 username 或 qq 登录（使用重试机制）
+    const admins = await withRetry(async () => {
+      return await sql`
+        SELECT id, username, display_name, qq, is_owner FROM admins 
+        WHERE (username = ${username} OR qq = ${username}) AND password = ${password}
+      `;
+    });
     
     if (admins.length === 0) {
       return NextResponse.json(
@@ -71,19 +56,12 @@ export async function POST(request: NextRequest) {
         ? `${displayName} 登录成功`
         : `${roleText} ${displayName} 登录成功`;
       
-      if (!useMockDb) {
-        await withRetry(async () => {
-          return await sql`
-            INSERT INTO admin_logs (admin_id, action, details, ip_address, created_at)
-            VALUES (${admin.id}, 'login', ${details}, ${clientIP}, NOW())
-          `;
-        });
-      } else {
-        await mockSql.query(
-          'INSERT INTO admin_logs (admin_id, action, details, ip_address, created_at) VALUES ($1, $2, $3, $4, NOW())',
-          [admin.id, 'login', details, clientIP]
-        );
-      }
+      await withRetry(async () => {
+        return await sql`
+          INSERT INTO admin_logs (admin_id, action, details, ip_address, created_at)
+          VALUES (${admin.id}, 'login', ${details}, ${clientIP}, NOW())
+        `;
+      });
     } catch (logError) {
       console.error('记录登录日志失败:', logError);
     }
@@ -94,7 +72,7 @@ export async function POST(request: NextRequest) {
       adminId: admin.id,
       qq: admin.qq,
       isOwner: admin.is_owner,
-      mockMode: useMockDb
+      mockMode: false
     });
     
   } catch (error: any) {

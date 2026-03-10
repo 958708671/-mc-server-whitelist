@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sql, { withRetry } from '@/lib/db';
-import { mockSql } from '@/lib/mock-db';
 import nodemailer from 'nodemailer';
 import { exec } from 'child_process';
 import path from 'path';
@@ -276,22 +275,13 @@ export async function PATCH(
     }
     
     let appResult: any[] = [];
-    let useMockDb = false;
     
-    try {
-      appResult = await withRetry(async () => {
-        return await sql`
-          SELECT minecraft_id, contact FROM whitelist_applications WHERE id = ${parseInt(id)}
-        `;
-      });
-    } catch (dbError) {
-      console.log('真实数据库连接失败，使用模拟数据库');
-      useMockDb = true;
-      appResult = await mockSql.query(
-        'SELECT minecraft_id, contact FROM whitelist_applications WHERE id = ?',
-        [parseInt(id)]
-      );
-    }
+    // 查询申请信息
+    appResult = await withRetry(async () => {
+      return await sql`
+        SELECT minecraft_id, contact FROM whitelist_applications WHERE id = ${parseInt(id)}
+      `;
+    });
     
     if (appResult.length === 0) {
       return NextResponse.json(
@@ -307,32 +297,26 @@ export async function PATCH(
     let whitelistResult = { success: false, message: '未配置RCON' };
     
     if (status === 'approved') {
-      if (!useMockDb) {
-        await withRetry(async () => {
-          return await sql`
-            UPDATE whitelist_applications 
-            SET status = 'approved', 
-                reviewed_by = ${reviewer}, 
-                reviewed_by_id = ${reviewerId},
-                review_note = ${note || ''},
-                reviewed_at = NOW()
-            WHERE id = ${parseInt(id)}
-          `;
-        });
-        
-        await withRetry(async () => {
-          return await sql`
-            INSERT INTO operation_logs (admin_id, admin_name, action, target_type, target_id, details)
-            VALUES (${reviewerId}, ${reviewer}, 'approve_application', 'whitelist', ${parseInt(id)}, ${'通过白名单申请: ' + minecraftId})
-          `;
-        });
-      } else {
-        // 更新模拟数据库
-        await mockSql.query(
-          'UPDATE whitelist_applications SET status = ?, reviewed_by = ?, reviewed_by_id = ?, review_note = ?, reviewed_at = ? WHERE id = ?',
-          ['approved', reviewer, reviewerId, note || '', new Date().toISOString(), parseInt(id)]
-        );
-      }
+      // 更新申请状态
+      await withRetry(async () => {
+        return await sql`
+          UPDATE whitelist_applications 
+          SET status = 'approved', 
+              reviewed_by = ${reviewer}, 
+              reviewed_by_id = ${reviewerId},
+              review_note = ${note || ''},
+              reviewed_at = NOW()
+          WHERE id = ${parseInt(id)}
+        `;
+      });
+      
+      // 记录操作日志
+      await withRetry(async () => {
+        return await sql`
+          INSERT INTO operation_logs (admin_id, admin_name, action, target_type, target_id, details)
+          VALUES (${reviewerId}, ${reviewer}, 'approve_application', 'whitelist', ${parseInt(id)}, ${'通过白名单申请: ' + minecraftId})
+        `;
+      });
       
       // 获取服务器设置（QQ群、下载地址、RCON配置）
       let settings: Record<string, string> = {
@@ -409,32 +393,26 @@ export async function PATCH(
       }
       
     } else if (status === 'rejected') {
-      if (!useMockDb) {
-        await withRetry(async () => {
-          return await sql`
-            UPDATE whitelist_applications 
-            SET status = 'rejected', 
-                reviewed_by = ${reviewer}, 
-                reviewed_by_id = ${reviewerId},
-                review_note = ${note || ''},
-                reviewed_at = NOW()
-            WHERE id = ${parseInt(id)}
-          `;
-        });
-        
-        await withRetry(async () => {
-          return await sql`
-            INSERT INTO operation_logs (admin_id, admin_name, action, target_type, target_id, details)
-            VALUES (${reviewerId}, ${reviewer}, 'reject_application', 'whitelist', ${parseInt(id)}, ${'拒绝白名单申请: ' + minecraftId})
-          `;
-        });
-      } else {
-        // 更新模拟数据库
-        await mockSql.query(
-          'UPDATE whitelist_applications SET status = ?, reviewed_by = ?, reviewed_by_id = ?, review_note = ?, reviewed_at = ? WHERE id = ?',
-          ['rejected', reviewer, reviewerId, note || '', new Date().toISOString(), parseInt(id)]
-        );
-      }
+      // 更新申请状态
+      await withRetry(async () => {
+        return await sql`
+          UPDATE whitelist_applications 
+          SET status = 'rejected', 
+              reviewed_by = ${reviewer}, 
+              reviewed_by_id = ${reviewerId},
+              review_note = ${note || ''},
+              reviewed_at = NOW()
+          WHERE id = ${parseInt(id)}
+        `;
+      });
+      
+      // 记录操作日志
+      await withRetry(async () => {
+        return await sql`
+          INSERT INTO operation_logs (admin_id, admin_name, action, target_type, target_id, details)
+          VALUES (${reviewerId}, ${reviewer}, 'reject_application', 'whitelist', ${parseInt(id)}, ${'拒绝白名单申请: ' + minecraftId})
+        `;
+      });
       
       // 发送邮件通知 - 异步执行，不阻塞响应
       if (emailConfig && contact) {
@@ -473,8 +451,7 @@ export async function PATCH(
     return NextResponse.json({
       success: true,
       message: '审核完成',
-      whitelistResult: status === 'approved' ? whitelistResult : undefined,
-      mockMode: useMockDb
+      whitelistResult: status === 'approved' ? whitelistResult : undefined
     });
   } catch (error) {
     console.error('审核失败:', error);

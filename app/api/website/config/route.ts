@@ -1,17 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sql, { withRetry } from '@/lib/db';
-import { mockServerSettings, shouldUseMockDb } from '@/lib/mock-db';
 
 export async function GET() {
   try {
-    if (shouldUseMockDb()) {
-      // 使用模拟数据库
-      return NextResponse.json({
-        success: true,
-        data: null
-      });
-    }
-    
     const result = await withRetry(async () => {
       return await sql`
         SELECT * FROM website_config WHERE id = 1
@@ -59,14 +50,6 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    if (shouldUseMockDb()) {
-      // 使用模拟数据库
-      return NextResponse.json({
-        success: true,
-        message: '保存成功'
-      });
-    }
-    
     const data = await request.json();
     
     const elementsJson = data.elements ? JSON.stringify(data.elements) : null;

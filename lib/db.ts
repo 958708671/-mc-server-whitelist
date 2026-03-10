@@ -28,10 +28,7 @@ export async function withRetry<T>(fn: () => Promise<T>, retries = 5, delay = 20
     if (retries === 0 || isConnectionError) {
       if (!dbConnectionFailed) {
         dbConnectionFailed = true;
-        console.log('[数据库] 连接/查询失败，自动开启模拟数据库');
-        import('./mock-db').then(({ setForceMockDb }) => {
-          setForceMockDb(true);
-        });
+        console.log('[数据库] 连接/查询失败');
       }
       throw error;
     }

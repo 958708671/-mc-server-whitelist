@@ -25,13 +25,10 @@ export async function POST() {
     
     resetDbConnectionStatus();
     
-    const { setForceMockDb } = await import('@/lib/mock-db');
-    setForceMockDb(false);
-    
     return NextResponse.json({
       success: true,
       connected: true,
-      message: '数据库连接已恢复，模拟数据库已关闭'
+      message: '数据库连接已恢复'
     });
   } catch (error: any) {
     return NextResponse.json({

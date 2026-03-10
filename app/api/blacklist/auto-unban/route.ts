@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sql, { withRetry } from '@/lib/db';
-import { shouldUseMockDb } from '@/lib/mock-db';
 
 let Rcon: any = null;
 try {
@@ -137,7 +136,6 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const useMockDb = shouldUseMockDb();
     const results: {
       expired: number;
       reminded: number;
@@ -147,14 +145,6 @@ export async function GET(request: NextRequest) {
       reminded: 0,
       errors: []
     };
-
-    if (useMockDb) {
-      return NextResponse.json({
-        success: true,
-        message: '模拟数据库模式，跳过自动解封',
-        ...results
-      });
-    }
 
     const now = new Date();
     const reminderTime = new Date(now.getTime() + 10 * 60 * 1000);

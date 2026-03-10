@@ -13,16 +13,16 @@ function DbErrorNotification({ onClose }: { onClose: () => void }) {
           </div>
           <div>
             <h2 className="text-xl font-bold text-white">数据库连接失败</h2>
-            <p className="text-orange-400 text-sm">已自动切换到模拟数据库</p>
+            <p className="text-orange-400 text-sm">请检查数据库连接配置</p>
           </div>
         </div>
         
         <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-4 mb-4">
           <p className="text-gray-300 text-sm leading-relaxed">
-            系统检测到无法连接到真实数据库，已自动为您开启<strong className="text-orange-400">模拟数据库模式</strong>。
+            系统检测到无法连接到数据库，请检查数据库连接配置和服务状态。
           </p>
           <p className="text-gray-400 text-xs mt-2">
-            在此模式下，所有数据仅保存在内存中，重启后将丢失。请检查数据库连接配置。
+            请确保数据库服务正在运行，且连接参数配置正确。
           </p>
         </div>
         
@@ -175,7 +175,6 @@ export default function AdminLayout({
   } | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [mockDbEnabled, setMockDbEnabled] = useState(false);
   const [showDbErrorNotification, setShowDbErrorNotification] = useState(false);
 
   useEffect(() => {
@@ -192,44 +191,19 @@ export default function AdminLayout({
     }
   }, []);
 
-  useEffect(() => {
-    fetch('/api/dev/mock-db')
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          setMockDbEnabled(data.mockDatabase);
-        }
-      })
-      .catch(() => {});
-  }, []);
-
   // 检查数据库连接状态
   useEffect(() => {
     fetch('/api/db-status')
       .then(res => res.json())
       .then(data => {
-        if (data.success && data.shouldShowNotification) {
+        if (!data.success) {
           setShowDbErrorNotification(true);
         }
       })
-      .catch(() => {});
-  }, []);
-
-  const toggleMockDb = async () => {
-    try {
-      const response = await fetch('/api/dev/mock-db', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: !mockDbEnabled })
+      .catch(() => {
+        setShowDbErrorNotification(true);
       });
-      const result = await response.json();
-      if (result.success) {
-        setMockDbEnabled(!mockDbEnabled);
-      }
-    } catch (error) {
-      console.error('切换失败:', error);
-    }
-  };
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('adminInfo');
@@ -389,23 +363,6 @@ export default function AdminLayout({
         </nav>
 
         <div className="p-3 border-t-2 border-gray-700 space-y-2 flex-shrink-0">
-          {!sidebarCollapsed && (
-            <div className="flex items-center justify-between px-3 py-2 bg-gray-800/50 rounded-xl mb-2">
-              <span className="text-xs text-gray-400">🧪 模拟数据库</span>
-              <button
-                onClick={toggleMockDb}
-                className={`relative w-10 h-5 rounded-full transition-colors ${
-                  mockDbEnabled ? 'bg-orange-500' : 'bg-gray-600'
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
-                    mockDbEnabled ? 'left-5' : 'left-0.5'
-                  }`}
-                />
-              </button>
-            </div>
-          )}
           <Link
             href="/"
             className="w-full flex items-center justify-center space-x-2 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-xl transition-all text-sm"

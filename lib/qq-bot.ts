@@ -1,6 +1,5 @@
 // QQ机器人工具
 import sql, { withRetry } from './db';
-import { mockSql } from './mock-db';
 
 interface QQBotConfig {
   apiUrl: string; // go-cqhttp HTTP API地址
@@ -95,7 +94,7 @@ export const sendFriendRequest = async (qq: string, message: string): Promise<bo
 // 从数据库获取管理员QQ号
 async function getAdminQqs(): Promise<string[]> {
   try {
-    // 尝试从真实数据库获取
+    // 从真实数据库获取
     const admins = await withRetry(async () => {
       return await sql`
         SELECT qq FROM admins 
@@ -104,18 +103,8 @@ async function getAdminQqs(): Promise<string[]> {
     });
     return admins.map((admin: any) => admin.qq);
   } catch (error) {
-    console.log('从真实数据库获取管理员QQ失败，尝试从模拟数据库获取:', error);
-    // 从模拟数据库获取
-    try {
-      const admins = await mockSql.query(
-        "SELECT qq FROM admins WHERE qq IS NOT NULL AND qq != '' AND receive_qq_notifications = TRUE",
-        []
-      );
-      return admins.map((admin: any) => admin.qq);
-    } catch (mockError) {
-      console.error('从模拟数据库获取管理员QQ失败:', mockError);
-      return [];
-    }
+    console.error('从数据库获取管理员QQ失败:', error);
+    return [];
   }
 }
 

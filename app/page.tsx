@@ -784,7 +784,6 @@ export default function HomePage() {
   const [adminUser, setAdminUser] = useState<string | null>(null);
   const [adminId, setAdminId] = useState<number | null>(null);
   const [isOwner, setIsOwner] = useState(false);
-  const [isMockMode, setIsMockMode] = useState(false);
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
@@ -875,27 +874,10 @@ export default function HomePage() {
         setAdminUser(adminInfo.user);
         setAdminId(adminInfo.adminId);
         setIsOwner(adminInfo.isOwner || false);
-        setIsMockMode(adminInfo.mockMode || false);
       } catch (e) {
         localStorage.removeItem('adminInfo');
       }
     }
-  }, []);
-
-  // 初始化模拟数据库状态
-  useEffect(() => {
-    const fetchMockDbStatus = async () => {
-      try {
-        const response = await fetch('/api/dev/mock-db');
-        const result = await response.json();
-        if (result.success) {
-          setIsMockMode(result.mockDatabase);
-        }
-      } catch (error) {
-        console.error('获取模拟数据库状态失败:', error);
-      }
-    };
-    fetchMockDbStatus();
   }, []);
   
   // Logo点击处理 - 连续点击5次显示登录弹窗（仅未登录时）
@@ -941,8 +923,7 @@ export default function HomePage() {
           user: result.user,
           adminId: result.adminId,
           qq: result.qq || '',
-          isOwner: result.isOwner || false,
-          mockMode: result.mockMode || false
+          isOwner: result.isOwner || false
         };
         
         // 保存到localStorage
@@ -952,7 +933,6 @@ export default function HomePage() {
         setAdminUser(result.user);
         setAdminId(result.adminId);
         setIsOwner(result.isOwner || false);
-        setIsMockMode(result.mockMode || false);
         setShowAdminLogin(false);
         setLoginForm({ username: '', password: '' });
         setLoginError('');
@@ -976,36 +956,9 @@ export default function HomePage() {
     setAdminUser(null);
     setAdminId(null);
     setIsOwner(false);
-    setIsMockMode(false);
   };
 
-  // 切换模拟数据库
-  const toggleMockDb = async () => {
-    try {
-      const newMode = !isMockMode;
-      const response = await fetch('/api/dev/mock-db', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ enabled: newMode })
-      });
-      const result = await response.json();
-      if (result.success) {
-        setIsMockMode(result.mockDatabase);
-        if (adminUser) {
-          const savedAdmin = localStorage.getItem('adminInfo');
-          if (savedAdmin) {
-            const adminInfo = JSON.parse(savedAdmin);
-            adminInfo.mockMode = result.mockDatabase;
-            localStorage.setItem('adminInfo', JSON.stringify(adminInfo));
-          }
-        }
-      }
-    } catch (error) {
-      console.error('切换模拟数据库失败:', error);
-    }
-  };
+
   
   // 简单的滚动监听，只更新当前section指示器
   useEffect(() => {
@@ -1164,21 +1117,6 @@ export default function HomePage() {
         <div className="container mx-auto px-6 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-4">
-              <div className="flex items-center space-x-2 px-3 py-2 bg-gray-800/50 rounded-xl">
-                <span className="text-xs text-gray-400">🧪 模拟数据库</span>
-                <button
-                  onClick={toggleMockDb}
-                  className={`relative w-10 h-5 rounded-full transition-colors ${
-                    isMockMode ? 'bg-orange-500' : 'bg-gray-600'
-                  }`}
-                >
-                  <span
-                    className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
-                      isMockMode ? 'left-5' : 'left-0.5'
-                    }`}
-                  />
-                </button>
-              </div>
               <div 
                 className="flex items-center space-x-2 cursor-pointer select-none"
                 onClick={handleLogoClick}
@@ -1237,11 +1175,6 @@ export default function HomePage() {
                     管理后台
                   </a>
                   <span className="text-gray-500 text-sm">|</span>
-                  {isMockMode && (
-                    <span className="bg-yellow-500/20 text-yellow-400 text-xs px-2 py-1 rounded border border-yellow-500/30" title="当前使用模拟数据库，数据不会保存">
-                      🧪 模拟模式
-                    </span>
-                  )}
                   <span className="text-gray-400 text-sm">{adminUser}</span>
                   <button 
                     onClick={handleAdminLogout}
