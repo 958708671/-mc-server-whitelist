@@ -6,7 +6,7 @@ const sql = neon(process.env.DATABASE_URL || '');
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
-    const { username, password, display_name, qq, is_owner, permissions, show_in_contact, show_in_logs } = data;
+    const { username, password, display_name, qq, is_owner, permissions, show_in_contact, show_in_logs, receive_qq_notifications } = data;
     
     if (!username || !password) {
       return NextResponse.json(
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     });
     
     await sql`
-      INSERT INTO admins (username, password, display_name, qq, is_owner, permissions, show_in_contact, show_in_logs)
+      INSERT INTO admins (username, password, display_name, qq, is_owner, permissions, show_in_contact, show_in_logs, receive_qq_notifications)
       VALUES (
         ${username}, 
         ${password}, 
@@ -63,7 +63,8 @@ export async function POST(request: NextRequest) {
         ${is_owner || false},
         ${JSON.stringify(finalPermissions)}::jsonb,
         ${show_in_contact !== false},
-        ${show_in_logs !== false}
+        ${show_in_logs !== false},
+        ${receive_qq_notifications !== false}
       )
     `;
     
@@ -130,6 +131,24 @@ export async function PATCH(request: NextRequest) {
     if (show_in_logs !== undefined) {
       updates.push(`show_in_logs = $${paramIndex}`);
       values.push(show_in_logs);
+      paramIndex++;
+    }
+    
+    if (data.receive_complaint_email !== undefined) {
+      updates.push(`receive_complaint_email = $${paramIndex}`);
+      values.push(data.receive_complaint_email);
+      paramIndex++;
+    }
+    
+    if (data.receive_application_email !== undefined) {
+      updates.push(`receive_application_email = $${paramIndex}`);
+      values.push(data.receive_application_email);
+      paramIndex++;
+    }
+    
+    if (data.receive_qq_notifications !== undefined) {
+      updates.push(`receive_qq_notifications = $${paramIndex}`);
+      values.push(data.receive_qq_notifications);
       paramIndex++;
     }
     

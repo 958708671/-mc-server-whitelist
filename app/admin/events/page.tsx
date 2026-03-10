@@ -243,7 +243,8 @@ export default function EventsPage() {
       month: '2-digit',
       day: '2-digit',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      hour12: false
     });
   };
 
@@ -287,14 +288,14 @@ export default function EventsPage() {
             onClick={handleExport}
             className="px-4 py-2 rounded-lg font-medium bg-emerald-600 hover:bg-emerald-700 text-white transition-all flex items-center gap-2"
           >
-            📥 {selectedIds.size > 0 ? `导出选中 (${selectedIds.size})` : '导出全部'}
+            📥 {selectedIds.size > 0 ? `选中导出 (${selectedIds.size})` : '导出全部'}
           </button>
           <button
             onClick={handleBatchDelete}
             disabled={selectedIds.size === 0 || processing}
             className="px-4 py-2 rounded-lg font-medium bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white transition-all flex items-center gap-2"
           >
-            🗑️ 批量删除 {selectedIds.size > 0 && `(${selectedIds.size})`}
+            🗑️ 选中删除 {selectedIds.size > 0 && `(${selectedIds.size})`}
           </button>
         </div>
       )}

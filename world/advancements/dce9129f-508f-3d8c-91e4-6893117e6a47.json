@@ -1,0 +1,57 @@
+{
+  "minecraft:recipes/decorations/crafting_table": {
+    "criteria": {
+      "unlock_right_away": "2024-08-02 14:19:54 +0800"
+    },
+    "done": true
+  },
+  "minecraft:end/root": {
+    "criteria": {
+      "entered_end": "2024-08-02 14:19:54 +0800"
+    },
+    "done": true
+  },
+  "ams:craftable_elytra": {
+    "criteria": {
+      "tick": "2024-08-02 14:19:54 +0800"
+    },
+    "done": true
+  },
+  "ams:root": {
+    "criteria": {
+      "tick": "2024-08-02 14:19:54 +0800"
+    },
+    "done": true
+  },
+  "minecraft:story/enter_the_end": {
+    "criteria": {
+      "entered_end": "2024-08-02 14:19:54 +0800"
+    },
+    "done": true
+  },
+  "minecraft:recipes/decorations/soul_campfire": {
+    "criteria": {
+      "has_soul_sand": "2024-08-02 14:20:13 +0800"
+    },
+    "done": true
+  },
+  "minecraft:recipes/decorations/chest": {
+    "criteria": {
+      "has_lots_of_items": "2024-08-02 14:35:29 +0800"
+    },
+    "done": true
+  },
+  "minecraft:recipes/decorations/soul_torch": {
+    "criteria": {
+      "has_soul_sand": "2024-08-02 14:20:13 +0800"
+    },
+    "done": true
+  },
+  "minecraft:nether/summon_wither": {
+    "criteria": {
+      "summoned": "2024-08-02 14:20:18 +0800"
+    },
+    "done": true
+  },
+  "DataVersion": 3953
+}

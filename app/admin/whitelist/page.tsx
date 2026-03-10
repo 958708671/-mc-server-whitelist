@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import BlacklistModal from '../components/BlacklistModal';
 
 interface WhitelistPlayer {
   id: number;
@@ -10,6 +11,7 @@ interface WhitelistPlayer {
   reviewed_by: string | null;
   reviewed_at: string | null;
   created_at: string;
+  ip_address?: string;
 }
 
 export default function WhitelistPage() {
@@ -19,10 +21,24 @@ export default function WhitelistPage() {
   const [stats, setStats] = useState({ total: 0, today: 0, thisWeek: 0 });
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [processing, setProcessing] = useState(false);
+  const [revokingId, setRevokingId] = useState<number | null>(null);
+  const [blacklistingId, setBlacklistingId] = useState<number | null>(null);
+  const [showBlacklistModal, setShowBlacklistModal] = useState(false);
+  const [blacklistTarget, setBlacklistTarget] = useState<{id: number; minecraftId: string; ipAddress?: string} | null>(null);
 
   useEffect(() => {
     fetchWhitelist();
   }, []);
+
+  useEffect(() => {
+    if (revokingId !== null) {
+      const timeout = setTimeout(() => {
+        console.log('安全重置revokingId');
+        setRevokingId(null);
+      }, 15000);
+      return () => clearTimeout(timeout);
+    }
+  }, [revokingId]);
 
   const fetchWhitelist = async (searchTerm?: string) => {
     setLoading(true);
@@ -95,6 +111,89 @@ export default function WhitelistPage() {
     }
   };
 
+  const handleRevoke = async (id: number, minecraftId: string) => {
+    if (!confirm(`确定要撤销 ${minecraftId} 的白名单审核吗？\n该操作将：\n1. 把申请重新放回待审核列表\n2. 从服务器白名单移除该玩家`)) return;
+    
+    setRevokingId(id);
+    let message = '';
+    
+    try {
+      const response = await fetch(`/api/whitelist/${id}/revoke`, { method: 'POST' });
+      
+      if (!response.ok) {
+        throw new Error('网络请求失败');
+      }
+      
+      const result = await response.json();
+      if (result.success) {
+        message = '撤销成功，申请已回到待审核状态';
+      } else {
+        message = result.message || '撤销失败';
+      }
+    } catch (error) {
+      console.error('撤销操作失败:', error);
+      message = '操作失败，请重试';
+    } finally {
+      setRevokingId(null);
+      // 强制刷新页面
+      setTimeout(() => {
+        fetchWhitelist();
+        console.log('白名单列表已刷新');
+      }, 100);
+      if (message) {
+        setTimeout(() => alert(message), 200);
+      }
+    }
+  };
+
+  const handleAddToBlacklistClick = (id: number, minecraftId: string, ipAddress?: string) => {
+    setBlacklistTarget({ id, minecraftId, ipAddress });
+    setShowBlacklistModal(true);
+  };
+
+  const handleBlacklistConfirm = async (reason: string, duration: number | null, isPermanent: boolean) => {
+    if (!blacklistTarget) return;
+    
+    const id = blacklistTarget.id;
+    const minecraftId = blacklistTarget.minecraftId;
+    const ipAddress = blacklistTarget.ipAddress;
+    
+    setShowBlacklistModal(false);
+    setBlacklistingId(id);
+    
+    try {
+      const response = await fetch('/api/blacklist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          minecraft_id: minecraftId,
+          ip_address: ipAddress,
+          reason: reason,
+          banned_by: '管理员',
+          whitelist_id: id,
+          duration: duration,
+          is_permanent: isPermanent
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        const durationText = isPermanent ? '永久' : duration ? `${Math.round(duration / 1440)}天` : '永久';
+        alert(`已拉入黑名单并封禁IP\n\n游戏ID：${minecraftId}\nIP地址：${ipAddress || '未知'}\n封禁原因：${reason}\n封禁时长：${durationText}\n\n服务器封禁结果：${result.banResult?.message || '未执行'}`);
+        fetchWhitelist();
+      } else {
+        alert(result.message || '操作失败');
+      }
+    } catch (error) {
+      console.error('拉黑操作失败:', error);
+      alert('操作失败，请重试');
+    } finally {
+      setBlacklistingId(null);
+      setBlacklistTarget(null);
+    }
+  };
+
   const handleExport = () => {
     const exportData = selectedIds.size > 0 
       ? players.filter(p => selectedIds.has(p.id))
@@ -134,7 +233,9 @@ export default function WhitelistPage() {
       month: '2-digit',
       day: '2-digit',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
     });
   };
 
@@ -194,14 +295,14 @@ export default function WhitelistPage() {
               onClick={handleExport}
               className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition-all flex items-center gap-2"
             >
-              📥 {selectedIds.size > 0 ? `导出选中 (${selectedIds.size})` : '导出全部'}
+              📥 {selectedIds.size > 0 ? `选中导出 (${selectedIds.size})` : '导出全部'}
             </button>
             <button
               onClick={handleBatchRemove}
               disabled={selectedIds.size === 0 || processing}
-              className="px-6 py-3 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl transition-all flex items-center gap-2"
+              className={`px-6 py-3 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl transition-all flex items-center gap-2`}
             >
-              🗑️ 移除选中 {selectedIds.size > 0 && `(${selectedIds.size})`}
+              {processing ? '处理中...' : <>🗑️ 选中删除 {selectedIds.size > 0 && `(${selectedIds.size})`}</>}
             </button>
           </>
         )}
@@ -234,6 +335,7 @@ export default function WhitelistPage() {
                 <th className="text-left px-4 py-3 text-gray-400 font-medium">联系方式</th>
                 <th className="text-left px-4 py-3 text-gray-400 font-medium">审核人</th>
                 <th className="text-left px-4 py-3 text-gray-400 font-medium">通过时间</th>
+                <th className="text-left px-4 py-3 text-gray-400 font-medium">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-700">
@@ -252,11 +354,43 @@ export default function WhitelistPage() {
                   <td className="px-4 py-3 text-gray-300">{player.contact}</td>
                   <td className="px-4 py-3 text-gray-300">{player.reviewed_by || '-'}</td>
                   <td className="px-4 py-3 text-gray-300">{formatDate(player.reviewed_at)}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleRevoke(player.id, player.minecraft_id)}
+                        disabled={revokingId === player.id}
+                        className={`px-3 py-1.5 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white text-sm rounded-lg transition-all flex items-center gap-2`}
+                      >
+                        {revokingId === player.id ? '处理中...' : '撤销'}
+                      </button>
+                      <button
+                        onClick={() => handleAddToBlacklistClick(player.id, player.minecraft_id, player.ip_address)}
+                        disabled={blacklistingId === player.id}
+                        className="px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm rounded-lg transition-all"
+                      >
+                        {blacklistingId === player.id ? '处理中...' : '拉黑'}
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+      )}
+      
+      {showBlacklistModal && blacklistTarget && (
+        <BlacklistModal
+          isOpen={showBlacklistModal}
+          onClose={() => {
+            setShowBlacklistModal(false);
+            setBlacklistTarget(null);
+          }}
+          onConfirm={handleBlacklistConfirm}
+          minecraftId={blacklistTarget.minecraftId}
+          ipAddress={blacklistTarget.ipAddress}
+          loading={blacklistingId !== null}
+        />
       )}
     </div>
   );

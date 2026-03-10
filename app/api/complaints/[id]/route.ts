@@ -44,7 +44,7 @@ export async function PATCH(
       if (adminId) {
         await sql`
           INSERT INTO operation_logs (admin_id, admin_name, action, target_type, target_id, details)
-          VALUES (${adminId}, ${adminName || '服主'}, 'restart_complaint', 'complaint', ${parseInt(id)}, ${note || '重启投诉案件'})
+          VALUES (${adminId}, ${adminName || '未知管理员'}, 'restart_complaint', 'complaint', ${parseInt(id)}, ${note || '重启投诉案件'})
         `;
       }
       

@@ -124,7 +124,7 @@ export const questionCategories: QuestionCategory[] = [
       { id: 41, question: '以下哪些生物会攻击玩家？', options: ['僵尸', '骷髅', '苦力怕', '末影人'], correct: [0, 1, 2, 3], type: 'multiple', note: '敌对生物列表' },
       { id: 42, question: '以下哪些方块可以用来制作工具？', options: ['木头', '石头', '铁锭', '钻石'], correct: [0, 1, 2, 3], type: 'multiple', note: '工具制作材料' },
       { id: 43, question: '以下哪些生物会掉落食物？', options: ['猪', '牛', '羊', '鸡'], correct: [0, 1, 2, 3], type: 'multiple', note: '食物来源生物' },
-      { id: 44, question: '以下哪些方块可以用来制作盔甲？', options: ['铁锭', '金锭', '钻石', '下界合金锭'], correct: [0, 1, 2, 3], type: 'multiple', note: '盔甲制作材料' },
+      { id: 44, question: '以下哪些物品可以用来制作盔甲？', options: ['铁锭', '金锭', '钻石', '下界合金锭'], correct: [0, 1, 2, 3], type: 'multiple', note: '盔甲制作材料' },
       { id: 45, question: '以下哪些生物会在水中生成？', options: ['溺尸', '守卫者', '鱿鱼', '海豚'], correct: [0, 1, 2, 3], type: 'multiple', note: '水生生物分布' },
       { id: 46, question: '以下哪些方块可以用来制作武器？', options: ['木头', '石头', '铁锭', '钻石'], correct: [0, 1, 2, 3], type: 'multiple', note: '武器制作材料' },
       { id: 47, question: '以下哪些生物可以被繁殖？', options: ['猪', '牛', '羊', '鸡'], correct: [0, 1, 2, 3], type: 'multiple', note: '可繁殖生物' },

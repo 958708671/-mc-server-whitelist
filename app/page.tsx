@@ -533,20 +533,13 @@ const LegalModal = ({ isOpen, onClose, type }: { isOpen: boolean, onClose: () =>
           </div>
         </div>
         
-        <div className="flex-shrink-0 mt-6 pt-4 border-t border-gray-700 flex gap-4">
+        <div className="flex-shrink-0 mt-6">
           <button 
             onClick={onClose}
-            className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-3 px-6 rounded-lg transition duration-300"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-300"
           >
             关闭
           </button>
-          <a 
-            href={`/legal/${type}`}
-            target="_blank"
-            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-300 text-center"
-          >
-            查看详情页
-          </a>
         </div>
       </div>
     </div>
@@ -791,8 +784,72 @@ export default function HomePage() {
   const [adminUser, setAdminUser] = useState<string | null>(null);
   const [adminId, setAdminId] = useState<number | null>(null);
   const [isOwner, setIsOwner] = useState(false);
+  const [isMockMode, setIsMockMode] = useState(false);
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [agreeToTerms, setAgreeToTerms] = useState(false);
+  
+  // 服务器状态
+  const [serverStatus, setServerStatus] = useState<{
+    status: 'online' | 'offline' | 'maintenance';
+    onlinePlayers: number;
+    maxPlayers: number;
+  }>({
+    status: 'offline',
+    onlinePlayers: 0,
+    maxPlayers: 20
+  });
+  
+  // 获取服务器状态
+  useEffect(() => {
+    const fetchServerStatus = async () => {
+      try {
+        const response = await fetch('/api/server-status');
+        const result = await response.json();
+        if (result.success) {
+          setServerStatus(result.data);
+        }
+      } catch (error) {
+        console.error('获取服务器状态失败:', error);
+        setServerStatus({
+          status: 'offline',
+          onlinePlayers: 0,
+          maxPlayers: 20
+        });
+      }
+    };
+    
+    fetchServerStatus();
+    // 每30秒刷新一次
+    const interval = setInterval(fetchServerStatus, 30000);
+    return () => clearInterval(interval);
+  }, []);
+  
+  // 获取状态显示配置
+  const getStatusConfig = () => {
+    switch (serverStatus.status) {
+      case 'online':
+        return {
+          text: '在线',
+          color: 'bg-green-500',
+          animate: true
+        };
+      case 'maintenance':
+        return {
+          text: '维护中',
+          color: 'bg-yellow-500',
+          animate: false
+        };
+      default:
+        return {
+          text: '离线',
+          color: 'bg-red-500',
+          animate: false
+        };
+    }
+  };
   
   // 从 elements 获取内容的辅助函数
   const getElementContent = (id: string, defaultValue: string): string => {
@@ -818,10 +875,27 @@ export default function HomePage() {
         setAdminUser(adminInfo.user);
         setAdminId(adminInfo.adminId);
         setIsOwner(adminInfo.isOwner || false);
+        setIsMockMode(adminInfo.mockMode || false);
       } catch (e) {
         localStorage.removeItem('adminInfo');
       }
     }
+  }, []);
+
+  // 初始化模拟数据库状态
+  useEffect(() => {
+    const fetchMockDbStatus = async () => {
+      try {
+        const response = await fetch('/api/dev/mock-db');
+        const result = await response.json();
+        if (result.success) {
+          setIsMockMode(result.mockDatabase);
+        }
+      } catch (error) {
+        console.error('获取模拟数据库状态失败:', error);
+      }
+    };
+    fetchMockDbStatus();
   }, []);
   
   // Logo点击处理 - 连续点击5次显示登录弹窗（仅未登录时）
@@ -842,6 +916,14 @@ export default function HomePage() {
   
   // 管理员登录
   const handleAdminLogin = async () => {
+    if (!loginForm.username || !loginForm.password) {
+      setLoginError('请输入用户名和密码');
+      return;
+    }
+    
+    setLoginLoading(true);
+    setLoginError('');
+    
     try {
       console.log('发送登录请求:', loginForm);
       const response = await fetch('/api/admin/login', {
@@ -858,7 +940,9 @@ export default function HomePage() {
         const adminInfo = {
           user: result.user,
           adminId: result.adminId,
-          isOwner: result.isOwner || false
+          qq: result.qq || '',
+          isOwner: result.isOwner || false,
+          mockMode: result.mockMode || false
         };
         
         // 保存到localStorage
@@ -868,15 +952,20 @@ export default function HomePage() {
         setAdminUser(result.user);
         setAdminId(result.adminId);
         setIsOwner(result.isOwner || false);
+        setIsMockMode(result.mockMode || false);
         setShowAdminLogin(false);
         setLoginForm({ username: '', password: '' });
         setLoginError('');
+        
+        // 登录成功，关闭弹窗，保持在当前页面
       } else {
         setLoginError(result.message || '登录失败');
       }
     } catch (error: any) {
       console.error('登录请求失败:', error);
       setLoginError('登录失败: ' + (error.message || '网络错误'));
+    } finally {
+      setLoginLoading(false);
     }
   };
   
@@ -887,6 +976,35 @@ export default function HomePage() {
     setAdminUser(null);
     setAdminId(null);
     setIsOwner(false);
+    setIsMockMode(false);
+  };
+
+  // 切换模拟数据库
+  const toggleMockDb = async () => {
+    try {
+      const newMode = !isMockMode;
+      const response = await fetch('/api/dev/mock-db', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ enabled: newMode })
+      });
+      const result = await response.json();
+      if (result.success) {
+        setIsMockMode(result.mockDatabase);
+        if (adminUser) {
+          const savedAdmin = localStorage.getItem('adminInfo');
+          if (savedAdmin) {
+            const adminInfo = JSON.parse(savedAdmin);
+            adminInfo.mockMode = result.mockDatabase;
+            localStorage.setItem('adminInfo', JSON.stringify(adminInfo));
+          }
+        }
+      }
+    } catch (error) {
+      console.error('切换模拟数据库失败:', error);
+    }
   };
   
   // 简单的滚动监听，只更新当前section指示器
@@ -1045,12 +1163,29 @@ export default function HomePage() {
       <nav className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-md border-b border-gray-800">
         <div className="container mx-auto px-6 py-4">
           <div className="flex justify-between items-center">
-            <div 
-              className="flex items-center space-x-2 cursor-pointer select-none"
-              onClick={handleLogoClick}
-            >
-              <div className="text-xl font-bold text-blue-400">CT Cloud tops</div>
-              <div className="text-xl font-bold text-white">云顶之境</div>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center space-x-2 px-3 py-2 bg-gray-800/50 rounded-xl">
+                <span className="text-xs text-gray-400">🧪 模拟数据库</span>
+                <button
+                  onClick={toggleMockDb}
+                  className={`relative w-10 h-5 rounded-full transition-colors ${
+                    isMockMode ? 'bg-orange-500' : 'bg-gray-600'
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
+                      isMockMode ? 'left-5' : 'left-0.5'
+                    }`}
+                  />
+                </button>
+              </div>
+              <div 
+                className="flex items-center space-x-2 cursor-pointer select-none"
+                onClick={handleLogoClick}
+              >
+                <div className="text-xl font-bold text-blue-400">CT Cloud tops</div>
+                <div className="text-xl font-bold text-white">云顶之境</div>
+              </div>
             </div>
             <div className="flex items-center space-x-6">
               <button 
@@ -1090,12 +1225,23 @@ export default function HomePage() {
               {adminLoggedIn ? (
                 <>
                   <a 
+                    href="/apply?skipQuiz=true"
+                    className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-5 rounded-lg transition duration-300"
+                  >
+                    直接申请白名单
+                  </a>
+                  <a 
                     href="/admin"
                     className="text-green-400 hover:text-green-300 text-sm transition-colors duration-300"
                   >
                     管理后台
                   </a>
                   <span className="text-gray-500 text-sm">|</span>
+                  {isMockMode && (
+                    <span className="bg-yellow-500/20 text-yellow-400 text-xs px-2 py-1 rounded border border-yellow-500/30" title="当前使用模拟数据库，数据不会保存">
+                      🧪 模拟模式
+                    </span>
+                  )}
                   <span className="text-gray-400 text-sm">{adminUser}</span>
                   <button 
                     onClick={handleAdminLogout}
@@ -1132,13 +1278,11 @@ export default function HomePage() {
             
             <div className="inline-flex items-center justify-center space-x-6 bg-black/50 backdrop-blur-sm px-8 py-4 rounded-full mb-16 border border-gray-700">
               <div className="flex items-center">
-                <div className="w-3 h-3 bg-green-500 rounded-full mr-2 animate-pulse"></div>
-                <span className="text-white">在线</span>
+                <div className={`w-3 h-3 rounded-full mr-2 ${getStatusConfig().color} ${getStatusConfig().animate ? 'animate-pulse' : ''}`}></div>
+                <span className="text-white">{getStatusConfig().text}</span>
               </div>
               <span className="text-gray-400">|</span>
-              <span className="text-white">24/7 稳定运行</span>
-              <span className="text-gray-400">|</span>
-              <span className="text-white">728 位玩家</span>
+              <span className="text-white">{serverStatus.onlinePlayers} / {serverStatus.maxPlayers} 人在线</span>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
@@ -1254,7 +1398,7 @@ export default function HomePage() {
                   <h3 className="text-xl font-bold text-white flex items-center gap-2">
                     <span>📢</span> 最新公告
                   </h3>
-                  <a href="/announcements" className="text-blue-400 hover:text-blue-300 text-sm">查看全部 →</a>
+    
                 </div>
                 {announcements.length > 0 ? (
                   <div className="space-y-3">
@@ -1289,7 +1433,7 @@ export default function HomePage() {
                   <h3 className="text-xl font-bold text-white flex items-center gap-2">
                     <span>🎉</span> 近期活动
                   </h3>
-                  <a href="/events" className="text-blue-400 hover:text-blue-300 text-sm">查看全部 →</a>
+
                 </div>
                 {events.length > 0 ? (
                   <div className="space-y-3">
@@ -1471,13 +1615,82 @@ export default function HomePage() {
                 </div>
                 
                 <div className="text-center">
-                  <a 
-                    href="/apply"
+                  <button 
+                    onClick={() => setShowTermsModal(true)}
                     className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-8 rounded-lg text-lg transition duration-300 inline-block"
                   >
                     开始申请
-                  </a>
+                  </button>
                 </div>
+                
+                {/* 服务协议和隐私协议弹窗 */}
+                {showTermsModal && (
+                  <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
+                    <div className="bg-gray-800 border border-gray-700 rounded-2xl p-8 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+                      <div className="flex justify-between items-center mb-6">
+                        <h3 className="text-2xl font-bold text-white">服务协议与免责声明</h3>
+                        <button 
+                          onClick={() => setShowTermsModal(false)}
+                          className="text-gray-400 hover:text-white text-xl"
+                        >
+                          ×
+                        </button>
+                      </div>
+                      
+                      <div className="space-y-6">
+                        <div>
+                          <h4 className="text-xl font-semibold text-blue-400 mb-3">服务协议与免责声明</h4>
+                          <div className="text-gray-300 space-y-2">
+                            <p>1. 本服务器仅为Minecraft爱好者提供游戏交流平台，不涉及任何商业活动。</p>
+                            <p>2. 您在服务器内的行为必须遵守相关法律法规和服务器规则，不得从事任何违法违规活动。</p>
+                            <p>3. 服务器管理员有权根据规则对违规玩家进行处罚，包括但不限于警告、禁言、封禁等。</p>
+                            <p>4. 服务器不对玩家在游戏内的虚拟财产损失负责，包括但不限于物品丢失、建筑损坏等。</p>
+                            <p>5. 服务器保留随时修改规则、关闭服务器或调整服务内容的权利，无需提前通知。</p>
+                            <p>6. 您的申请信息将仅用于服务器审核和管理目的，我们会尽力保护您的个人信息，但不承担因不可抗力或第三方攻击导致的信息泄露责任。</p>
+                            <p>7. 您在使用服务器服务过程中因自身原因导致的任何损失，服务器不承担赔偿责任。</p>
+                            <p>8. 本协议的最终解释权归服务器管理团队所有。</p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="mt-8 space-y-4">
+                        <div className="flex items-start space-x-2">
+                          <input
+                            type="checkbox"
+                            id="agreeToTerms"
+                            checked={agreeToTerms}
+                            onChange={(e) => setAgreeToTerms(e.target.checked)}
+                            className="mt-1"
+                          />
+                          <label htmlFor="agreeToTerms" className="text-gray-300">
+                            我已阅读并同意上述服务协议与免责声明 <span className="text-red-500">*</span>
+                          </label>
+                        </div>
+                        
+                        <div className="flex gap-4">
+                          <button
+                            onClick={() => setShowTermsModal(false)}
+                            className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-3 px-6 rounded-lg transition duration-300"
+                          >
+                            取消
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (agreeToTerms) {
+                                setShowTermsModal(false);
+                                window.location.href = '/apply';
+                              }
+                            }}
+                            disabled={!agreeToTerms}
+                            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-300 disabled:bg-gray-700 disabled:cursor-not-allowed"
+                          >
+                            同意并继续
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
               
               <div className="bg-gray-900/70 p-8 rounded-xl border border-gray-700">
@@ -1709,7 +1922,8 @@ export default function HomePage() {
                   type="text"
                   value={loginForm.username}
                   onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
-                  className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500"
+                  disabled={loginLoading}
+                  className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   placeholder="请输入用户名"
                 />
               </div>
@@ -1719,9 +1933,10 @@ export default function HomePage() {
                   type="password"
                   value={loginForm.password}
                   onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                  className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500"
+                  disabled={loginLoading}
+                  className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   placeholder="请输入密码"
-                  onKeyDown={(e) => e.key === 'Enter' && handleAdminLogin()}
+                  onKeyDown={(e) => !loginLoading && e.key === 'Enter' && handleAdminLogin()}
                 />
               </div>
             </div>
@@ -1733,15 +1948,27 @@ export default function HomePage() {
                   setLoginForm({ username: '', password: '' });
                   setLoginError('');
                 }}
-                className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-3 rounded-lg transition-colors"
+                disabled={loginLoading}
+                className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-3 rounded-lg transition-colors disabled:opacity-50"
               >
                 取消
               </button>
               <button
                 onClick={handleAdminLogin}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg transition-colors"
+                disabled={loginLoading}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg transition-colors disabled:opacity-70 flex items-center justify-center gap-2"
               >
-                登录
+                {loginLoading ? (
+                  <>
+                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>登录中...</span>
+                  </>
+                ) : (
+                  '登录'
+                )}
               </button>
             </div>
           </div>

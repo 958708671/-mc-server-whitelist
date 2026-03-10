@@ -1,0 +1,14 @@
+[tool.poetry]
+name = "qq-bot"
+version = "0.1.0"
+description = "Minecraft服务器QQ机器人"
+authors = ["Your Name <your.email@example.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+nonebot2 = "^2.4.0"
+nonebot-adapter-onebot = "^2.4.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

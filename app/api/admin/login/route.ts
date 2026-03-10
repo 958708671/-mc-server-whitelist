@@ -1,14 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { neon } from '@neondatabase/serverless';
-
-// 获取数据库连接
-const getSql = () => {
-  const databaseUrl = process.env.DATABASE_URL;
-  if (!databaseUrl) {
-    throw new Error('DATABASE_URL not set');
-  }
-  return neon(databaseUrl);
-};
+import sql, { withRetry } from '@/lib/db';
+import { mockSql } from '@/lib/mock-db';
 
 // 获取客户端IP地址
 const getClientIP = (request: NextRequest): string => {
@@ -39,13 +31,27 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    const sql = getSql();
+    let admins: any[] = [];
+    let useMockDb = false;
     
-    // 查询管理员
-    const admins = await sql`
-      SELECT id, username, display_name, qq, is_owner FROM admins 
-      WHERE username = ${username} AND password = ${password}
-    `;
+    // 尝试连接真实数据库
+    try {
+      // 查询管理员 - 支持用 username 或 qq 登录（使用重试机制）
+      admins = await withRetry(async () => {
+        return await sql`
+          SELECT id, username, display_name, qq, is_owner FROM admins 
+          WHERE (username = ${username} OR qq = ${username}) AND password = ${password}
+        `;
+      });
+    } catch (dbError) {
+      console.log('真实数据库连接失败，切换到模拟数据库:', dbError);
+      useMockDb = true;
+      // 使用模拟数据库
+      admins = await mockSql.query(
+        'SELECT id, username, display_name, qq, is_owner FROM admins WHERE (username = $1 OR qq = $1) AND password = $2',
+        [username, password]
+      );
+    }
     
     if (admins.length === 0) {
       return NextResponse.json(
@@ -58,33 +64,44 @@ export async function POST(request: NextRequest) {
     
     // 记录登录日志（包含IP地址）
     try {
-      const sqlLog = getSql();
       const roleText = admin.is_owner ? '服主' : '管理员';
       // 如果 display_name 已经包含角色信息，只使用 display_name
       const displayName = admin.display_name || admin.username;
       const details = displayName === roleText 
         ? `${displayName} 登录成功`
         : `${roleText} ${displayName} 登录成功`;
-      await sqlLog`
-        INSERT INTO admin_logs (admin_id, action, details, ip_address, created_at)
-        VALUES (${admin.id}, 'login', ${details}, ${clientIP}, NOW())
-      `;
+      
+      if (!useMockDb) {
+        await withRetry(async () => {
+          return await sql`
+            INSERT INTO admin_logs (admin_id, action, details, ip_address, created_at)
+            VALUES (${admin.id}, 'login', ${details}, ${clientIP}, NOW())
+          `;
+        });
+      } else {
+        await mockSql.query(
+          'INSERT INTO admin_logs (admin_id, action, details, ip_address, created_at) VALUES ($1, $2, $3, $4, NOW())',
+          [admin.id, 'login', details, clientIP]
+        );
+      }
     } catch (logError) {
       console.error('记录登录日志失败:', logError);
     }
     
     return NextResponse.json({
       success: true,
-      user: admin.display_name || admin.username,
+      user: admin.username,
       adminId: admin.id,
       qq: admin.qq,
-      isOwner: admin.is_owner
+      isOwner: admin.is_owner,
+      mockMode: useMockDb
     });
     
   } catch (error: any) {
     console.error('登录失败:', error);
+    console.error('Error stack:', error.stack);
     return NextResponse.json(
-      { success: false, message: '登录失败: ' + (error.message || '未知错误') },
+      { success: false, message: '登录失败: ' + (error.message || '未知错误'), error: error.stack },
       { status: 500 }
     );
   }

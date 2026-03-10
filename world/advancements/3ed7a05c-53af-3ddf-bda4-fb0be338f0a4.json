@@ -1,0 +1,39 @@
+{
+  "tpa:first_join": {
+    "criteria": {
+      "tick": "2024-06-28 18:13:34 +0800"
+    },
+    "done": true
+  },
+  "minecraft:recipes/decorations/crafting_table": {
+    "criteria": {
+      "unlock_right_away": "2024-06-28 18:13:34 +0800"
+    },
+    "done": true
+  },
+  "minecraft:end/root": {
+    "criteria": {
+      "entered_end": "2024-06-28 18:13:34 +0800"
+    },
+    "done": true
+  },
+  "ams:craftable_elytra": {
+    "criteria": {
+      "tick": "2024-06-28 18:13:34 +0800"
+    },
+    "done": true
+  },
+  "ams:root": {
+    "criteria": {
+      "tick": "2024-06-28 18:13:34 +0800"
+    },
+    "done": true
+  },
+  "minecraft:story/enter_the_end": {
+    "criteria": {
+      "entered_end": "2024-06-28 18:13:34 +0800"
+    },
+    "done": true
+  },
+  "DataVersion": 3953
+}

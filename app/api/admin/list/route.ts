@@ -1,15 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { neon } from '@neondatabase/serverless';
-
-const sql = neon(process.env.DATABASE_URL || '');
+import sql, { withRetry } from '@/lib/db';
+import { mockSql } from '@/lib/mock-db';
 
 export async function GET(request: NextRequest) {
   try {
-    const admins = await sql`
-      SELECT id, username, display_name, qq, is_owner, permissions, show_in_contact, show_in_logs, created_at
-      FROM admins
-      ORDER BY is_owner DESC, id ASC
-    `;
+    let admins: any[] = [];
+    let useMockDb = false;
+    
+    try {
+      admins = await withRetry(async () => {
+        return await sql`
+          SELECT id, username, display_name, qq, is_owner, permissions, show_in_contact, show_in_logs, receive_complaint_email, receive_application_email, created_at
+          FROM admins
+          ORDER BY is_owner DESC, id ASC
+        `;
+      });
+    } catch (dbError) {
+      console.log('真实数据库连接失败，切换到模拟数据库:', dbError);
+      useMockDb = true;
+      admins = await mockSql.query(
+        'SELECT id, username, display_name, qq, is_owner, permissions, show_in_contact, show_in_logs, receive_complaint_email, receive_application_email, created_at FROM admins ORDER BY is_owner DESC, id ASC'
+      );
+    }
     
     // 解析 permissions JSONB 字段
     const formattedAdmins = admins.map(admin => ({
@@ -28,12 +40,15 @@ export async function GET(request: NextRequest) {
         monitor_view: false
       },
       show_in_contact: admin.show_in_contact !== false,
-      show_in_logs: admin.show_in_logs !== false
+      show_in_logs: admin.show_in_logs !== false,
+      receive_complaint_email: admin.receive_complaint_email === true,
+      receive_application_email: admin.receive_application_email === true
     }));
     
     return NextResponse.json({
       success: true,
-      data: formattedAdmins
+      data: formattedAdmins,
+      mockMode: useMockDb
     });
     
   } catch (error) {

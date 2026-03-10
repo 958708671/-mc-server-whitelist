@@ -9,6 +9,8 @@ export default function ComplaintPage() {
     violationYear: '',
     violationMonth: '',
     violationDay: '',
+    violationHour: '',
+    violationMinute: '',
     violationTime: '',
     violationType: '',
     description: '',
@@ -62,7 +64,22 @@ export default function ComplaintPage() {
       const newData = { ...prev, [name]: value };
       if (name === 'violationYear' || name === 'violationMonth') {
         newData.violationDay = '';
+        newData.violationHour = '';
+        newData.violationMinute = '';
+      } else if (name === 'violationDay') {
+        newData.violationHour = '';
+        newData.violationMinute = '';
       }
+      
+      // 当所有时间字段都填写时，更新 violationTime
+      if (newData.violationYear && newData.violationMonth && newData.violationDay && newData.violationHour && newData.violationMinute) {
+        newData.violationTime = `${newData.violationYear}-${newData.violationMonth}-${newData.violationDay}T${newData.violationHour}:${newData.violationMinute}`;
+      } else if (newData.violationYear && newData.violationMonth && newData.violationDay) {
+        newData.violationTime = `${newData.violationYear}-${newData.violationMonth}-${newData.violationDay}T12:00`;
+      } else {
+        newData.violationTime = '';
+      }
+      
       return newData;
     });
   };
@@ -70,6 +87,11 @@ export default function ComplaintPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    
+    console.log('提交表单数据:', JSON.stringify(formData, null, 2));
+    console.log('violationTime:', formData.violationTime);
+    console.log('violationHour:', formData.violationHour);
+    console.log('violationMinute:', formData.violationMinute);
     
     try {
       const response = await fetch('/api/complaint', {
@@ -89,6 +111,8 @@ export default function ComplaintPage() {
           violationYear: '',
           violationMonth: '',
           violationDay: '',
+          violationHour: '',
+          violationMinute: '',
           violationTime: '',
           violationType: '',
           description: '',
@@ -239,7 +263,7 @@ export default function ComplaintPage() {
                   onClick={() => setUseDatePicker(!useDatePicker)}
                   className="text-cyan-400 text-sm hover:text-cyan-300 transition-colors flex items-center gap-1"
                 >
-                  <span>{useDatePicker ? '📅' : '🗓️'}</span>
+                  <span>{useDatePicker ? '🗓️' : '📅'}</span>
                   {useDatePicker ? '使用快速选择' : '使用日期选择器'}
                 </button>
               </div>
@@ -258,17 +282,26 @@ export default function ComplaintPage() {
                   />
                   <input
                     type="time"
+                    step="60"
                     value={formData.violationTime ? formData.violationTime.split('T')[1] || '' : ''}
                     onChange={(e) => {
-                      const date = formData.violationTime ? formData.violationTime.split('T')[0] : new Date().toISOString().split('T')[0];
+                      const date = formData.violationTime ? formData.violationTime.split('T')[0] : (() => {
+                        const now = new Date();
+                        const year = now.getFullYear();
+                        const month = String(now.getMonth() + 1).padStart(2, '0');
+                        const day = String(now.getDate()).padStart(2, '0');
+                        return `${year}-${month}-${day}`;
+                      })();
                       const time = e.target.value;
+                      console.log('选择的时间:', time);
+                      // 直接使用用户选择的时间，不进行时区转换
                       setFormData(prev => ({ ...prev, violationTime: `${date}T${time}` }));
                     }}
                     className="w-full bg-gray-800 border-2 border-gray-600 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-cyan-500 transition-all"
                   />
                 </div>
               ) : (
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                   <select
                     name="violationYear"
                     value={formData.violationYear}
@@ -301,6 +334,32 @@ export default function ComplaintPage() {
                     {Array.from({ length: getDaysInMonth(formData.violationYear, formData.violationMonth) }, (_, i) => {
                       const day = (i + 1).toString().padStart(2, '0');
                       return <option key={day} value={day}>{i + 1}日</option>;
+                    })}
+                  </select>
+                  <select
+                    name="violationHour"
+                    value={formData.violationHour}
+                    onChange={handleChange}
+                    disabled={!formData.violationDay}
+                    className="bg-gray-800 border-2 border-gray-600 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-cyan-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <option value="">选择小时</option>
+                    {Array.from({ length: 24 }, (_, i) => {
+                      const hour = i.toString().padStart(2, '0');
+                      return <option key={hour} value={hour}>{hour}:00</option>;
+                    })}
+                  </select>
+                  <select
+                    name="violationMinute"
+                    value={formData.violationMinute}
+                    onChange={handleChange}
+                    disabled={!formData.violationHour}
+                    className="bg-gray-800 border-2 border-gray-600 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-cyan-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <option value="">选择分钟</option>
+                    {Array.from({ length: 60 }, (_, i) => {
+                      const minute = i.toString().padStart(2, '0');
+                      return <option key={minute} value={minute}>{minute}</option>;
                     })}
                   </select>
                 </div>

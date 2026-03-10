@@ -22,7 +22,7 @@ interface Complaint {
 
 interface AdminInfo {
   id: number;
-  name: string;
+  user: string;
   isOwner: boolean;
 }
 
@@ -203,7 +203,7 @@ function DetailModal({
                 <span>⏰</span>
                 <span className="text-gray-400 text-xs">违规时间</span>
               </div>
-              <div className="text-white text-sm">{complaint.violation_time || '未填写'}</div>
+              <div className="text-white text-sm">{formatViolationTime(complaint.violation_time)}</div>
             </div>
             <div className="bg-gray-800/50 p-3 rounded-xl border border-gray-700">
               <div className="flex items-center gap-2 mb-1">
@@ -245,7 +245,10 @@ function DetailModal({
                 <span>⚔️</span>
                 <span className="text-gray-400 text-xs">处理人</span>
               </div>
-              <div className="text-cyan-400 font-semibold">{complaint.handler}</div>
+              <div className="text-cyan-400 font-semibold">{complaint.handler === '服主' && adminInfo.user ? adminInfo.user : complaint.handler}</div>
+              <div className="text-gray-400 text-xs mt-1">
+                职位: {adminInfo.isOwner ? '服主' : '管理员'}
+              </div>
             </div>
           )}
 
@@ -291,13 +294,7 @@ function DetailModal({
             </div>
           )}
 
-          <div className="bg-gray-800/50 p-3 rounded-xl border border-gray-700">
-            <div className="flex items-center gap-2 mb-1">
-              <span>📅</span>
-              <span className="text-gray-400 text-xs">提交时间</span>
-            </div>
-            <div className="text-white text-sm">{complaint.created_at}</div>
-          </div>
+
         </div>
 
         <div className="p-4 border-t-2 border-gray-700 bg-gray-900/80 flex-shrink-0">
@@ -317,13 +314,13 @@ function DetailModal({
               <div>
                 <label className="flex items-center gap-2 text-gray-300 text-sm mb-2">
                   <span>🖼️</span>
-                  图片证据链接（多个用逗号分隔）
+                  百度云盘证据编号（单个文件夹，格式：日期+被举报人）
                 </label>
                 <input
                   type="text"
                   value={imageUrls}
                   onChange={(e) => setImageUrls(e.target.value)}
-                  placeholder="https://example.com/img1.png, https://example.com/img2.png"
+                  placeholder="例如：20240101a"
                   className="w-full bg-gray-800 border-2 border-gray-600 rounded-xl px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500 text-sm"
                 />
               </div>
@@ -356,7 +353,7 @@ function DetailModal({
                   className="flex-1 px-4 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white rounded-xl font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg text-sm"
                 >
                   <span>⛏️</span>
-                  <span>{isSubmitting ? '接取中...' : '接取处理'}</span>
+                  <span>{isSubmitting ? '接取中...' : (adminInfo.isOwner ? '服主接取' : '接取处理')}</span>
                 </button>
               )}
               {currentStatus === 'processing' && (
@@ -415,7 +412,7 @@ export default function AdminComplaintsPage() {
   const [filter, setFilter] = useState('all');
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [adminInfo, setAdminInfo] = useState<AdminInfo>({ id: 0, name: '', isOwner: false });
+  const [adminInfo, setAdminInfo] = useState<AdminInfo>({ id: 0, user: '', isOwner: false });
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
   const [processing, setProcessing] = useState(false);
@@ -425,7 +422,7 @@ export default function AdminComplaintsPage() {
     if (savedAdmin) {
       try {
         const info = JSON.parse(savedAdmin);
-        setAdminInfo({ id: info.adminId, name: info.user, isOwner: info.isOwner || false });
+        setAdminInfo({ id: info.adminId, user: info.user, isOwner: info.isOwner || false });
       } catch (e) {
         window.location.href = '/admin';
       }
@@ -445,7 +442,18 @@ export default function AdminComplaintsPage() {
       const response = await fetch(`/api/complaints?status=${filter}&adminId=${adminId}&isOwner=${isOwner}`);
       const result = await response.json();
       if (result.success) {
-        setComplaints(result.data);
+        // 检查并更新处理人为"服主"的记录
+        const updatedComplaints = result.data.map((complaint: any) => {
+          if (complaint.handler === '服主' && adminInfo.user) {
+            // 如果处理人是"服主"且当前管理员用户名不为空，将其改为当前管理员的用户名
+            return {
+              ...complaint,
+              handler: adminInfo.user
+            };
+          }
+          return complaint;
+        });
+        setComplaints(updatedComplaints);
       }
     } catch (error) {
       console.error('获取投诉列表失败:', error);
@@ -455,10 +463,10 @@ export default function AdminComplaintsPage() {
   };
 
   useEffect(() => {
-    if (adminInfo.id) {
+    if (adminInfo.id && adminInfo.user) {
       fetchComplaints(adminInfo.id, adminInfo.isOwner);
     }
-  }, [filter, adminInfo.id, adminInfo.isOwner]);
+  }, [filter, adminInfo.id, adminInfo.isOwner, adminInfo.user]);
 
   const updateStatus = async (id: number, status: string, note?: string, images?: string): Promise<boolean> => {
     try {
@@ -468,7 +476,7 @@ export default function AdminComplaintsPage() {
         body: JSON.stringify({
           status,
           adminId: adminInfo.id,
-          adminName: adminInfo.name,
+          adminName: adminInfo.user,
           resolutionNote: note,
           resolutionImages: images
         }),
@@ -481,7 +489,7 @@ export default function AdminComplaintsPage() {
           setSelectedComplaint({ 
             ...selectedComplaint, 
             status: status as any,
-            handler: adminInfo.name,
+            handler: adminInfo.user,
             handler_id: adminInfo.id,
             resolution_note: note,
             resolution_images: images
@@ -508,7 +516,8 @@ export default function AdminComplaintsPage() {
 
     try {
       const response = await fetch(
-        `/api/complaints/${deleteTargetId}?adminId=${adminInfo.id}&adminName=${encodeURIComponent(adminInfo.name || '')}`,
+        `/api/complaints/${deleteTargetId}?adminId=${adminInfo.id}&adminName=${encodeURIComponent(adminInfo.user || '')}`,
+
         { method: 'DELETE' }
       );
 
@@ -543,6 +552,76 @@ export default function AdminComplaintsPage() {
       case 'rejected': return '❌ 已驳回';
       default: return '未知';
     }
+  };
+
+  // 关键修复函数：将存储的 UTC 时间字符串转换为本地时间显示
+  const formatStoredTimeForDisplay = (utcTimeString: string) => {
+    // 1. 正确解析：将数据库中的字符串转换为 Date 对象
+    //    数据库里的 "2026-03-08T13:05:01.315Z" 会被理解为 UTC 时间 13:05
+    const utcDate = new Date(utcTimeString);
+    
+    // 2. 转换为本地时间：这一步会让 JavaScript 自动根据您电脑的时区（UTC+8）进行转换
+    const localDate = new Date(utcDate.getTime()); // 或者直接使用 utcDate 也可以
+    
+    // 3. 格式化为可读的北京时间字符串
+    return localDate.toLocaleString('zh-CN', {
+      timeZone: 'Asia/Shanghai', // 显式指定时区更可靠
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false // 使用24小时制
+    }).replace(/\//g, '/');
+    // 返回结果示例："2026/03/08 21:05:01"
+  };
+
+  const formatDate = (dateStr: string) => {
+    return formatStoredTimeForDisplay(dateStr);
+  };
+
+  const formatViolationTime = (timeStr: string | undefined) => {
+    if (!timeStr || timeStr === '未填写') return '未填写';
+    
+    if (timeStr.includes('T')) {
+      // 确保ISO格式时间被解析为UTC时间
+      if (!timeStr.endsWith('Z')) {
+        // 如果没有Z后缀，手动构建UTC时间
+        const [datePart, timePart] = timeStr.split('T');
+        const [year, month, day] = datePart.split('-').map(Number);
+        const [hour, minute, second] = timePart.split(':').map(Number);
+        const utcDate = new Date(Date.UTC(year, month - 1, day, hour, minute, second || 0));
+        return formatStoredTimeForDisplay(utcDate.toISOString());
+      }
+      // 使用标准的时区转换函数
+      return formatStoredTimeForDisplay(timeStr);
+    }
+    
+    const chineseMatch = timeStr.match(/(\d{4})年(\d{1,2})月(\d{1,2})日\s*(\d{1,2}):(\d{2})/);
+    if (chineseMatch) {
+      const [, year, month, day, hour, minute] = chineseMatch;
+      // 构建UTC日期对象并使用时区转换
+      const utcDate = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute)));
+      return formatStoredTimeForDisplay(utcDate.toISOString());
+    }
+    
+    const slashMatch = timeStr.match(/(\d{4})\/(\d{1,2})\/(\d{1,2})\s*(\d{1,2}):(\d{2})/);
+    if (slashMatch) {
+      const [, year, month, day, hour, minute] = slashMatch;
+      // 构建UTC日期对象并使用时区转换
+      const utcDate = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute)));
+      return formatStoredTimeForDisplay(utcDate.toISOString());
+    }
+    
+    const dashMatch = timeStr.match(/(\d{4})-(\d{1,2})-(\d{1,2})\s*(\d{1,2}):(\d{2})/);
+    if (dashMatch) {
+      const [, year, month, day, hour, minute] = dashMatch;
+      // 构建UTC日期对象并使用时区转换
+      const utcDate = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute)));
+      return formatStoredTimeForDisplay(utcDate.toISOString());
+    }
+    
+    return timeStr;
   };
 
   const filteredComplaints = complaints.filter(c =>
@@ -670,7 +749,14 @@ export default function AdminComplaintsPage() {
           filteredComplaints.map((complaint) => (
             <div
               key={complaint.id}
-              onClick={() => setSelectedComplaint(complaint)}
+              onClick={() => {
+                // 检查并更新处理人为"服主"的记录
+                const updatedComplaint = {
+                  ...complaint,
+                  handler: complaint.handler === '服主' && adminInfo.user ? adminInfo.user : complaint.handler
+                };
+                setSelectedComplaint(updatedComplaint);
+              }}
               className="bg-gray-800/50 border-2 border-gray-700 p-4 rounded-xl cursor-pointer transition-all hover:border-cyan-500/50 hover:bg-gray-800/80"
             >
               <div className="flex justify-between items-start mb-3">
@@ -699,18 +785,18 @@ export default function AdminComplaintsPage() {
                 </div>
                 <div className="bg-gray-900/50 p-2 rounded-lg">
                   <span className="text-gray-500">⏰</span>
-                  <span className="text-gray-300 ml-1">{complaint.violation_time || '未填写'}</span>
+                  <span className="text-gray-300 ml-1">{formatViolationTime(complaint.violation_time)}</span>
                 </div>
                 <div className="bg-gray-900/50 p-2 rounded-lg">
                   <span className="text-gray-500">📅</span>
-                  <span className="text-gray-300 ml-1">{new Date(complaint.created_at).toLocaleDateString()}</span>
+                  <span className="text-gray-300 ml-1">{formatDate(complaint.created_at)}</span>
                 </div>
               </div>
 
               {complaint.handler && (
                 <div className="text-xs text-cyan-400 mb-2 flex items-center gap-1">
                   <span>⚔️</span>
-                  <span>处理人: {complaint.handler}</span>
+                  <span>处理人: {complaint.handler === '服主' && adminInfo.user ? adminInfo.user : complaint.handler}</span>
                 </div>
               )}
 

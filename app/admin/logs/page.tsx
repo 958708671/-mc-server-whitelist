@@ -130,7 +130,8 @@ export default function LogsPage() {
       day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
-      second: '2-digit'
+      second: '2-digit',
+      hour12: false
     });
   };
 
@@ -224,14 +225,14 @@ export default function LogsPage() {
               onClick={handleExport}
               className="px-4 py-2 rounded-lg font-medium bg-emerald-600 hover:bg-emerald-700 text-white transition-all flex items-center gap-2"
             >
-              📥 {selectedIds.size > 0 ? `导出选中 (${selectedIds.size})` : '导出全部'}
+              📥 {selectedIds.size > 0 ? `选中导出 (${selectedIds.size})` : '导出全部'}
             </button>
             <button
               onClick={handleDelete}
               disabled={selectedIds.size === 0 || processing}
               className="px-4 py-2 rounded-lg font-medium bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white transition-all flex items-center gap-2"
             >
-              🗑️ 删除选中 {selectedIds.size > 0 && `(${selectedIds.size})`}
+              🗑️ 选中删除 {selectedIds.size > 0 && `(${selectedIds.size})`}
             </button>
           </div>
         )}
@@ -264,6 +265,7 @@ export default function LogsPage() {
                 <th className="text-left px-4 py-3 text-gray-400 font-medium text-sm">操作类型</th>
                 <th className="text-left px-4 py-3 text-gray-400 font-medium text-sm">目标</th>
                 <th className="text-left px-4 py-3 text-gray-400 font-medium text-sm">详情</th>
+                <th className="text-left px-4 py-3 text-gray-400 font-medium text-sm">IP地址</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-700">
@@ -295,7 +297,10 @@ export default function LogsPage() {
                     ) : '-'}
                   </td>
                   <td className="px-4 py-3 text-gray-400 text-sm max-w-xs truncate">
-                    {log.details || log.ip_address || '-'}
+                    {log.details || '-'}
+                  </td>
+                  <td className="px-4 py-3 text-gray-500 text-sm">
+                    {log.ip_address || '-'}
                   </td>
                 </tr>
               ))}

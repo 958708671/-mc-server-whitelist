@@ -2,207 +2,152 @@
 
 import { useState, useEffect } from 'react';
 
-interface BlacklistPlayer {
+interface BlacklistEntry {
   id: number;
   minecraft_id: string;
+  ip_address: string | null;
   reason: string;
-  banned_by: string | null;
-  created_at: string;
+  banned_by: string;
+  banned_by_id: number | null;
+  is_permanent: boolean;
+  duration_minutes: number | null;
   expires_at: string | null;
+  is_active: boolean;
+  created_at: string;
 }
 
 export default function BlacklistPage() {
-  const [players, setPlayers] = useState<BlacklistPlayer[]>([]);
+  const [entries, setEntries] = useState<BlacklistEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [formData, setFormData] = useState({
-    minecraft_id: '',
-    reason: ''
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 1
   });
-  const [saving, setSaving] = useState(false);
-  const [adminInfo, setAdminInfo] = useState<{ user: string; adminId: number } | null>(null);
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [processing, setProcessing] = useState(false);
+  const [removingId, setRemovingId] = useState<number | null>(null);
+  const [revokingId, setRevokingId] = useState<number | null>(null);
 
   useEffect(() => {
-    const savedAdmin = localStorage.getItem('adminInfo');
-    if (savedAdmin) {
-      setAdminInfo(JSON.parse(savedAdmin));
-    }
     fetchBlacklist();
-  }, []);
+  }, [pagination.page]);
 
   const fetchBlacklist = async (searchTerm?: string) => {
     setLoading(true);
     try {
       const url = searchTerm 
-        ? `/api/blacklist?search=${encodeURIComponent(searchTerm)}`
-        : '/api/blacklist';
+        ? `/api/blacklist?search=${encodeURIComponent(searchTerm)}&page=${pagination.page}&limit=${pagination.limit}`
+        : `/api/blacklist?page=${pagination.page}&limit=${pagination.limit}`;
       const response = await fetch(url);
       const result = await response.json();
       if (result.success) {
-        setPlayers(result.data);
-        setSelectedIds(new Set());
+        setEntries(result.entries);
+        setPagination(result.pagination);
       }
     } catch (error) {
-      console.error('获取黑名单列表失败:', error);
+      console.error('获取黑名单失败:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const toggleSelectAll = () => {
-    if (selectedIds.size === players.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(players.map(p => p.id)));
-    }
-  };
-
-  const toggleSelect = (id: number) => {
-    const newSelected = new Set(selectedIds);
-    if (newSelected.has(id)) {
-      newSelected.delete(id);
-    } else {
-      newSelected.add(id);
-    }
-    setSelectedIds(newSelected);
-  };
-
-  const handleBatchRemove = async () => {
-    if (selectedIds.size === 0) {
-      alert('请先选择要解除封禁的玩家');
-      return;
-    }
-    if (!confirm(`确定要解除 ${selectedIds.size} 个玩家的封禁吗？`)) return;
-    
-    setProcessing(true);
-    try {
-      for (const id of selectedIds) {
-        await fetch(`/api/blacklist/${id}`, { method: 'DELETE' });
-      }
-      alert('批量解除成功');
-      fetchBlacklist();
-    } catch (error) {
-      alert('操作失败，请重试');
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  const handleExport = () => {
-    const exportData = selectedIds.size > 0 
-      ? players.filter(p => selectedIds.has(p.id))
-      : players;
-    
-    if (exportData.length === 0) {
-      alert('没有可导出的数据');
-      return;
-    }
-    
-    const csvContent = [
-      ['游戏ID', '封禁原因', '操作人', '封禁时间', '解封时间'].join(','),
-      ...exportData.map(p => [
-        p.minecraft_id,
-        (p.reason || '').replace(/"/g, '""'),
-        p.banned_by || '系统',
-        formatDate(p.created_at),
-        formatDate(p.expires_at)
-      ].map(field => `"${field}"`).join(','))
-    ].join('\n');
-    
-    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `黑名单列表_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.csv`;
-    link.click();
-  };
-
   const handleSearch = () => {
+    setPagination(prev => ({ ...prev, page: 1 }));
     fetchBlacklist(search);
   };
 
-  const handleAdd = async () => {
-    if (!formData.minecraft_id) {
-      alert('请填写游戏ID');
-      return;
-    }
-    if (!adminInfo) {
-      alert('请先登录');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const response = await fetch('/api/blacklist', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          minecraft_id: formData.minecraft_id,
-          reason: formData.reason,
-          banned_by: adminInfo.user,
-          banned_by_id: adminInfo.adminId
-        })
-      });
-      const result = await response.json();
-      if (result.success) {
-        setShowAddModal(false);
-        setFormData({ minecraft_id: '', reason: '' });
-        fetchBlacklist();
-      } else {
-        alert(result.message || '添加失败');
-      }
-    } catch (error) {
-      alert('添加失败，请重试');
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const handleRemove = async (id: number, minecraftId: string) => {
-    if (!confirm(`确定要将 ${minecraftId} 从黑名单移除吗？`)) return;
+    if (!confirm(`确定要将 ${minecraftId} 从黑名单移除吗？\n\n该操作将：\n1. 从黑名单移除\n2. 解封该IP地址`)) return;
+    
+    setRemovingId(id);
     
     try {
-      const response = await fetch(`/api/blacklist/${id}`, { method: 'DELETE' });
+      const response = await fetch(`/api/blacklist?id=${id}`, {
+        method: 'DELETE'
+      });
+      
       const result = await response.json();
+      
       if (result.success) {
+        alert(`已从黑名单移除并解封IP\n\n游戏ID：${minecraftId}`);
         fetchBlacklist();
       } else {
-        alert(result.message || '移除失败');
+        alert(result.message || '操作失败');
       }
     } catch (error) {
-      alert('移除失败，请重试');
+      console.error('移除黑名单失败:', error);
+      alert('操作失败，请重试');
+    } finally {
+      setRemovingId(null);
     }
   };
 
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return '-';
+  const handleRevoke = async (id: number, minecraftId: string) => {
+    if (!confirm(`确定要撤回 ${minecraftId} 的封禁吗？\n\n该操作将：\n1. 从黑名单移除\n2. 解封该IP地址\n3. 用户需重新提交白名单申请`)) return;
+    
+    setRevokingId(id);
+    
+    try {
+      const response = await fetch(`/api/blacklist?id=${id}&action=revoke`, {
+        method: 'DELETE'
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        alert(`已撤回封禁\n\n游戏ID：${minecraftId}\n\n用户将回到待审核状态，需要重新提交白名单申请`);
+        fetchBlacklist();
+      } else {
+        alert(result.message || '操作失败');
+      }
+    } catch (error) {
+      console.error('撤回封禁失败:', error);
+      alert('操作失败，请重试');
+    } finally {
+      setRevokingId(null);
+    }
+  };
+
+  const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleString('zh-CN', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
     });
+  };
+
+  const formatExpiresAt = (expiresAt: string | null, isPermanent: boolean) => {
+    if (isPermanent) return '永久';
+    if (!expiresAt) return '-';
+    const now = new Date();
+    const expires = new Date(expiresAt);
+    const diff = expires.getTime() - now.getTime();
+    
+    if (diff <= 0) return '已过期';
+    
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    
+    if (days > 0) return `${days}天${hours % 24}小时`;
+    if (hours > 0) return `${hours}小时${minutes % 60}分钟`;
+    return `${minutes}分钟`;
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-4">
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
             <span>🚫</span> 黑名单管理
           </h1>
-          <p className="text-gray-400 text-sm mt-1">管理被禁止加入的玩家</p>
+          <p className="text-gray-400 text-sm mt-1">管理被封禁的玩家和IP地址</p>
         </div>
-        
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-all flex items-center gap-2"
-        >
-          <span>➕</span> 添加黑名单
-        </button>
       </div>
 
       <div className="flex gap-3 flex-wrap">
@@ -211,12 +156,12 @@ export default function BlacklistPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-          placeholder="搜索玩家ID..."
-          className="flex-1 min-w-[200px] bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-red-500"
+          placeholder="搜索游戏ID或IP地址..."
+          className="flex-1 min-w-[200px] bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500"
         />
         <button
           onClick={handleSearch}
-          className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl transition-all"
+          className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all"
         >
           搜索
         </button>
@@ -226,140 +171,107 @@ export default function BlacklistPage() {
         >
           重置
         </button>
-        {players.length > 0 && (
-          <>
-            <button
-              onClick={handleExport}
-              className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition-all flex items-center gap-2"
-            >
-              📥 {selectedIds.size > 0 ? `导出选中 (${selectedIds.size})` : '导出全部'}
-            </button>
-            <button
-              onClick={handleBatchRemove}
-              disabled={selectedIds.size === 0 || processing}
-              className="px-6 py-3 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl transition-all flex items-center gap-2"
-            >
-              🔓 批量解封 {selectedIds.size > 0 && `(${selectedIds.size})`}
-            </button>
-          </>
-        )}
       </div>
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <div className="text-4xl animate-bounce">🚫</div>
         </div>
-      ) : players.length === 0 ? (
+      ) : entries.length === 0 ? (
         <div className="bg-gray-800 rounded-xl p-12 text-center">
-          <div className="text-6xl mb-4">✨</div>
-          <p className="text-gray-400 text-lg">黑名单为空</p>
+          <div className="text-6xl mb-4">📭</div>
+          <p className="text-gray-400 text-lg">暂无黑名单记录</p>
         </div>
       ) : (
-        <div className="bg-gray-800 rounded-xl overflow-hidden border border-gray-700">
-          <table className="w-full">
-            <thead className="bg-gray-900/50">
-              <tr>
-                <th className="px-4 py-3 text-left">
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.size === players.length && players.length > 0}
-                    onChange={toggleSelectAll}
-                    className="w-4 h-4 rounded bg-gray-700 border-gray-600 text-cyan-500 focus:ring-cyan-500"
-                  />
-                </th>
-                <th className="text-left px-4 py-3 text-gray-400 font-medium">游戏ID</th>
-                <th className="text-left px-4 py-3 text-gray-400 font-medium">封禁原因</th>
-                <th className="text-left px-4 py-3 text-gray-400 font-medium">操作人</th>
-                <th className="text-left px-4 py-3 text-gray-400 font-medium">封禁时间</th>
-                <th className="text-left px-4 py-3 text-gray-400 font-medium">操作</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-700">
-              {players.map((player) => (
-                <tr key={player.id} className="hover:bg-gray-700/30 transition-colors">
-                  <td className="px-4 py-3">
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(player.id)}
-                      onChange={() => toggleSelect(player.id)}
-                      className="w-4 h-4 rounded bg-gray-700 border-gray-600 text-cyan-500 focus:ring-cyan-500"
-                    />
-                  </td>
-                  <td className="px-4 py-3 text-white font-medium">{player.minecraft_id}</td>
-                  <td className="px-4 py-3 text-gray-400 text-sm max-w-xs truncate">{player.reason || '-'}</td>
-                  <td className="px-4 py-3 text-gray-300">{player.banned_by || '系统'}</td>
-                  <td className="px-4 py-3 text-gray-300">{formatDate(player.created_at)}</td>
-                  <td className="px-4 py-3">
-                    <button
-                      onClick={() => handleRemove(player.id, player.minecraft_id)}
-                      className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-all text-sm"
-                    >
-                      解除封禁
-                    </button>
-                  </td>
+        <>
+          <div className="bg-gray-800 rounded-xl overflow-hidden border border-gray-700">
+            <table className="w-full">
+              <thead className="bg-gray-900/50">
+                <tr>
+                  <th className="text-left px-4 py-3 text-gray-400 font-medium">游戏ID</th>
+                  <th className="text-left px-4 py-3 text-gray-400 font-medium">IP地址</th>
+                  <th className="text-left px-4 py-3 text-gray-400 font-medium">封禁原因</th>
+                  <th className="text-left px-4 py-3 text-gray-400 font-medium">封禁时长</th>
+                  <th className="text-left px-4 py-3 text-gray-400 font-medium">到期时间</th>
+                  <th className="text-left px-4 py-3 text-gray-400 font-medium">封禁人</th>
+                  <th className="text-left px-4 py-3 text-gray-400 font-medium">封禁时间</th>
+                  <th className="text-left px-4 py-3 text-gray-400 font-medium">操作</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border-2 border-gray-700 rounded-2xl p-6 w-full max-w-md shadow-2xl">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                <span>🚫</span> 添加黑名单
-              </h2>
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="text-gray-400 hover:text-white text-2xl"
-              >
-                ×
-              </button>
-            </div>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-gray-300 text-sm mb-2 font-medium">游戏ID *</label>
-                <input
-                  type="text"
-                  value={formData.minecraft_id}
-                  onChange={(e) => setFormData({ ...formData, minecraft_id: e.target.value })}
-                  placeholder="输入玩家游戏ID"
-                  className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-red-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-gray-300 text-sm mb-2 font-medium">封禁原因</label>
-                <textarea
-                  value={formData.reason}
-                  onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-                  placeholder="输入封禁原因"
-                  rows={3}
-                  className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-red-500 resize-none"
-                />
-              </div>
-            </div>
-            
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="flex-1 px-4 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-xl transition-all"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleAdd}
-                disabled={saving}
-                className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl transition-all disabled:opacity-50"
-              >
-                {saving ? '添加中...' : '添加'}
-              </button>
-            </div>
+              </thead>
+              <tbody className="divide-y divide-gray-700">
+                {entries.map((entry) => (
+                  <tr key={entry.id} className="hover:bg-gray-700/30 transition-colors">
+                    <td className="px-4 py-3 text-white font-medium">{entry.minecraft_id}</td>
+                    <td className="px-4 py-3 text-gray-300 font-mono text-sm">{entry.ip_address || '-'}</td>
+                    <td className="px-4 py-3 text-gray-300 max-w-xs truncate" title={entry.reason}>
+                      {entry.reason}
+                    </td>
+                    <td className="px-4 py-3 text-gray-300">
+                      {entry.is_permanent ? (
+                        <span className="text-red-400">永久</span>
+                      ) : entry.duration_minutes ? (
+                        <span>{Math.round(entry.duration_minutes / 1440)}天</span>
+                      ) : '-'}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      {entry.is_permanent ? (
+                        <span className="text-gray-500">永久</span>
+                      ) : entry.expires_at ? (
+                        <span className={formatExpiresAt(entry.expires_at, entry.is_permanent) === '已过期' ? 'text-green-400' : 'text-orange-400'}>
+                          {formatExpiresAt(entry.expires_at, entry.is_permanent)}
+                        </span>
+                      ) : (
+                        <span className="text-gray-500">-</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-gray-300">{entry.banned_by}</td>
+                    <td className="px-4 py-3 text-gray-300 text-sm">{formatDate(entry.created_at)}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleRevoke(entry.id, entry.minecraft_id)}
+                          disabled={revokingId === entry.id || removingId === entry.id}
+                          className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white text-sm rounded-lg transition-all"
+                        >
+                          {revokingId === entry.id ? '处理中...' : '撤回'}
+                        </button>
+                        <button
+                          onClick={() => handleRemove(entry.id, entry.minecraft_id)}
+                          disabled={removingId === entry.id || revokingId === entry.id}
+                          className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm rounded-lg transition-all"
+                        >
+                          {removingId === entry.id ? '处理中...' : '移除'}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </div>
+
+          {pagination.totalPages > 1 && (
+            <div className="flex justify-center gap-2">
+              <button
+                onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                disabled={pagination.page === 1}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white rounded-lg transition-all"
+              >
+                上一页
+              </button>
+              <span className="px-4 py-2 text-gray-300">
+                {pagination.page} / {pagination.totalPages}
+              </span>
+              <button
+                onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                disabled={pagination.page === pagination.totalPages}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white rounded-lg transition-all"
+              >
+                下一页
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

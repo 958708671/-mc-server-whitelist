@@ -1,8 +1,77 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { neon } from '@neondatabase/serverless';
+import sql, { withRetry } from '@/lib/db';
+import { mockSql } from '@/lib/mock-db';
 import nodemailer from 'nodemailer';
+import { exec } from 'child_process';
+import path from 'path';
+import { notifyUserApplicationApproved, notifyUserApplicationRejected } from '@/lib/qq-bot';
 
-const sql = neon(process.env.DATABASE_URL || '');
+const rconAddToWhitelist = (
+  host: string,
+  port: number,
+  password: string,
+  playerName: string
+): Promise<{ success: boolean; message: string }> => {
+  return new Promise(async (resolve) => {
+    try {
+      const scriptPath = path.join(process.cwd(), 'scripts', 'rcon-cli.js');
+      
+      const addCommand = `whitelist add ${playerName}`;
+      const addResult = await new Promise<{ success: boolean; message: string }>((resolveAdd) => {
+        exec(
+          `node "${scriptPath}" "${host}" "${port}" "${password}" "${addCommand}"`,
+          { timeout: 10000 },
+          (error, stdout, stderr) => {
+            if (error) {
+              resolveAdd({ success: false, message: `执行失败: ${error.message}` });
+              return;
+            }
+            
+            try {
+              const output = JSON.parse(stdout.trim());
+              resolveAdd(output);
+            } catch {
+              resolveAdd({ success: false, message: `解析输出失败: ${stdout}` });
+            }
+          }
+        );
+      });
+      
+      if (!addResult.success) {
+        resolve(addResult);
+        return;
+      }
+      
+      const reloadCommand = 'whitelist reload';
+      const reloadResult = await new Promise<{ success: boolean; message: string }>((resolveReload) => {
+        exec(
+          `node "${scriptPath}" "${host}" "${port}" "${password}" "${reloadCommand}"`,
+          { timeout: 10000 },
+          (error, stdout, stderr) => {
+            if (error) {
+              resolveReload({ success: false, message: `执行失败: ${error.message}` });
+              return;
+            }
+            
+            try {
+              const output = JSON.parse(stdout.trim());
+              resolveReload(output);
+            } catch {
+              resolveReload({ success: false, message: `解析输出失败: ${stdout}` });
+            }
+          }
+        );
+      });
+      
+      resolve({
+        success: true,
+        message: `添加成功: ${addResult.message}, 重载成功: ${reloadResult.message}`
+      });
+    } catch (error) {
+      resolve({ success: false, message: `执行失败: ${error}` });
+    }
+  });
+};
 
 const getEmailConfig = () => {
   const service = process.env.EMAIL_SERVICE || 'qq';
@@ -206,9 +275,23 @@ export async function PATCH(
       );
     }
     
-    const appResult = await sql`
-      SELECT minecraft_id, contact FROM whitelist_applications WHERE id = ${parseInt(id)}
-    `;
+    let appResult: any[] = [];
+    let useMockDb = false;
+    
+    try {
+      appResult = await withRetry(async () => {
+        return await sql`
+          SELECT minecraft_id, contact FROM whitelist_applications WHERE id = ${parseInt(id)}
+        `;
+      });
+    } catch (dbError) {
+      console.log('真实数据库连接失败，使用模拟数据库');
+      useMockDb = true;
+      appResult = await mockSql.query(
+        'SELECT minecraft_id, contact FROM whitelist_applications WHERE id = ?',
+        [parseInt(id)]
+      );
+    }
     
     if (appResult.length === 0) {
       return NextResponse.json(
@@ -221,68 +304,163 @@ export async function PATCH(
     const contact = appResult[0].contact;
     
     const emailConfig = getEmailConfig();
+    let whitelistResult = { success: false, message: '未配置RCON' };
     
     if (status === 'approved') {
-      await sql`
-        UPDATE whitelist_applications 
-        SET status = 'approved', 
-            reviewed_by = ${reviewer}, 
-            reviewed_by_id = ${reviewerId},
-            review_note = ${note || ''},
-            reviewed_at = NOW()
-        WHERE id = ${parseInt(id)}
-      `;
-      
-      await sql`
-        INSERT INTO operation_logs (admin_id, admin_name, action, target_type, target_id, details)
-        VALUES (${reviewerId}, ${reviewer}, 'approve_application', 'whitelist', ${parseInt(id)}, ${'通过白名单申请: ' + minecraftId})
-      `;
-      
-      if (emailConfig && contact) {
-        const settingsResult = await sql`
-          SELECT setting_key, setting_value FROM server_settings 
-          WHERE setting_key IN ('qq_group', 'client_download_url')
-        `;
-        
-        const settings: Record<string, string> = {};
-        settingsResult.forEach((s: any) => {
-          settings[s.setting_key] = s.setting_value;
+      if (!useMockDb) {
+        await withRetry(async () => {
+          return await sql`
+            UPDATE whitelist_applications 
+            SET status = 'approved', 
+                reviewed_by = ${reviewer}, 
+                reviewed_by_id = ${reviewerId},
+                review_note = ${note || ''},
+                reviewed_at = NOW()
+            WHERE id = ${parseInt(id)}
+          `;
         });
         
-        const qqGroup = settings.qq_group || '请联系管理员获取';
-        const downloadUrl = settings.client_download_url || '请联系管理员获取';
+        await withRetry(async () => {
+          return await sql`
+            INSERT INTO operation_logs (admin_id, admin_name, action, target_type, target_id, details)
+            VALUES (${reviewerId}, ${reviewer}, 'approve_application', 'whitelist', ${parseInt(id)}, ${'通过白名单申请: ' + minecraftId})
+          `;
+        });
+      } else {
+        // 更新模拟数据库
+        await mockSql.query(
+          'UPDATE whitelist_applications SET status = ?, reviewed_by = ?, reviewed_by_id = ?, review_note = ?, reviewed_at = ? WHERE id = ?',
+          ['approved', reviewer, reviewerId, note || '', new Date().toISOString(), parseInt(id)]
+        );
+      }
+      
+      // 获取服务器设置（QQ群、下载地址、RCON配置）
+      let settings: Record<string, string> = {
+        qq_group: '',
+        client_download_url: '',
+        rcon_host: '127.0.0.1',
+        rcon_port: '25575',
+        rcon_password: 'cloudtops2024'
+      };
+      
+      try {
+        const settingsResult = await withRetry(async () => {
+          return await sql`
+            SELECT setting_key, setting_value FROM server_settings
+          `;
+        });
         
+        settingsResult.forEach((s: any) => {
+          settings[s.setting_key] = s.setting_value || '';
+        });
+      } catch (e) {
+        console.log('从数据库获取服务器设置失败，使用默认配置:', e);
+      }
+      
+      console.log('服务器设置:', settings);
+      
+      const qqGroup = settings.qq_group || '请联系管理员获取';
+      const downloadUrl = settings.client_download_url || '请联系管理员获取';
+      
+      // 尝试添加到服务器白名单
+      if (settings.rcon_host && settings.rcon_password) {
+        const rconPort = parseInt(settings.rcon_port) || 25575;
+        try {
+          whitelistResult = await rconAddToWhitelist(
+            settings.rcon_host,
+            rconPort,
+            settings.rcon_password,
+            minecraftId
+          );
+          console.log('添加白名单结果:', whitelistResult);
+        } catch (error) {
+          console.error('添加白名单失败:', error);
+          whitelistResult = { success: false, message: '添加白名单失败' };
+        }
+      } else {
+        console.log('RCON配置不完整，跳过自动添加白名单');
+      }
+      
+      // 发送邮件通知 - 异步执行，不阻塞响应
+      if (emailConfig && contact) {
         let email = contact;
         if (/^\d+$/.test(contact)) {
           email = `${contact}@qq.com`;
         }
         
-        await sendApprovedEmail(email, minecraftId, qqGroup, downloadUrl, emailConfig);
+        (async () => {
+          try {
+            await sendApprovedEmail(email, minecraftId, qqGroup, downloadUrl, emailConfig);
+          } catch (error) {
+            console.error('发送审核通过邮件失败:', error);
+          }
+        })();
+      }
+      
+      // 发送QQ通知 - 异步执行，不阻塞响应
+      if (/^\d+$/.test(contact)) {
+        (async () => {
+          try {
+            await notifyUserApplicationApproved(contact, minecraftId, qqGroup, downloadUrl);
+          } catch (error) {
+            console.error('发送QQ审核通过通知失败:', error);
+          }
+        })();
       }
       
     } else if (status === 'rejected') {
-      await sql`
-        UPDATE whitelist_applications 
-        SET status = 'rejected', 
-            reviewed_by = ${reviewer}, 
-            reviewed_by_id = ${reviewerId},
-            review_note = ${note || ''},
-            reviewed_at = NOW()
-        WHERE id = ${parseInt(id)}
-      `;
+      if (!useMockDb) {
+        await withRetry(async () => {
+          return await sql`
+            UPDATE whitelist_applications 
+            SET status = 'rejected', 
+                reviewed_by = ${reviewer}, 
+                reviewed_by_id = ${reviewerId},
+                review_note = ${note || ''},
+                reviewed_at = NOW()
+            WHERE id = ${parseInt(id)}
+          `;
+        });
+        
+        await withRetry(async () => {
+          return await sql`
+            INSERT INTO operation_logs (admin_id, admin_name, action, target_type, target_id, details)
+            VALUES (${reviewerId}, ${reviewer}, 'reject_application', 'whitelist', ${parseInt(id)}, ${'拒绝白名单申请: ' + minecraftId})
+          `;
+        });
+      } else {
+        // 更新模拟数据库
+        await mockSql.query(
+          'UPDATE whitelist_applications SET status = ?, reviewed_by = ?, reviewed_by_id = ?, review_note = ?, reviewed_at = ? WHERE id = ?',
+          ['rejected', reviewer, reviewerId, note || '', new Date().toISOString(), parseInt(id)]
+        );
+      }
       
-      await sql`
-        INSERT INTO operation_logs (admin_id, admin_name, action, target_type, target_id, details)
-        VALUES (${reviewerId}, ${reviewer}, 'reject_application', 'whitelist', ${parseInt(id)}, ${'拒绝白名单申请: ' + minecraftId})
-      `;
-      
+      // 发送邮件通知 - 异步执行，不阻塞响应
       if (emailConfig && contact) {
         let email = contact;
         if (/^\d+$/.test(contact)) {
           email = `${contact}@qq.com`;
         }
         
-        await sendRejectedEmail(email, minecraftId, note || '', emailConfig);
+        (async () => {
+          try {
+            await sendRejectedEmail(email, minecraftId, note || '', emailConfig);
+          } catch (error) {
+            console.error('发送审核拒绝邮件失败:', error);
+          }
+        })();
+      }
+      
+      // 发送QQ通知 - 异步执行，不阻塞响应
+      if (/^\d+$/.test(contact)) {
+        (async () => {
+          try {
+            await notifyUserApplicationRejected(contact, minecraftId, note || '');
+          } catch (error) {
+            console.error('发送QQ审核拒绝通知失败:', error);
+          }
+        })();
       }
       
     } else {
@@ -294,7 +472,9 @@ export async function PATCH(
     
     return NextResponse.json({
       success: true,
-      message: '审核完成'
+      message: '审核完成',
+      whitelistResult: status === 'approved' ? whitelistResult : undefined,
+      mockMode: useMockDb
     });
   } catch (error) {
     console.error('审核失败:', error);

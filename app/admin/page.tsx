@@ -37,15 +37,7 @@ export default function AdminDashboard() {
           </div>
         </a>
 
-        <div className="bg-gray-800 border border-gray-700 rounded-xl p-6 opacity-50">
-          <div className="flex items-center space-x-4">
-            <div className="text-4xl">📊</div>
-            <div>
-              <h3 className="text-xl font-semibold text-white">数据统计</h3>
-              <p className="text-gray-400 text-sm mt-1">即将上线</p>
-            </div>
-          </div>
-        </div>
+
       </div>
 
       <div className="mt-8 bg-gray-800 border border-gray-700 rounded-xl p-6">

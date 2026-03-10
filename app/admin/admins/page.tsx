@@ -12,6 +12,8 @@ interface Admin {
   permissions: Permissions;
   show_in_contact: boolean;
   show_in_logs: boolean;
+  receive_complaint_email: boolean;
+  receive_application_email: boolean;
   created_at: string;
 }
 
@@ -57,6 +59,29 @@ const permissionLabels: Record<keyof Permissions, string> = {
   monitor_view: '监控查看'
 };
 
+const permissionCategories = [
+  {
+    name: '👥 用户管理',
+    permissions: ['whitelist_review', 'blacklist_manage'] as const
+  },
+  {
+    name: '📝 内容管理',
+    permissions: ['announcement_manage', 'event_manage', 'website_edit'] as const
+  },
+  {
+    name: '🔧 系统管理',
+    permissions: ['settings_view', 'admin_manage', 'logs_view', 'monitor_view'] as const
+  },
+  {
+    name: '🚨 投诉处理',
+    permissions: ['complaint_handle'] as const
+  },
+  {
+    name: '📊 数据统计',
+    permissions: ['statistics_view'] as const
+  }
+];
+
 export default function AdminsPage() {
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,7 +97,10 @@ export default function AdminsPage() {
     is_owner: false,
     permissions: { ...defaultPermissions },
     show_in_contact: true,
-    show_in_logs: true
+    show_in_logs: true,
+    receive_complaint_email: false,
+    receive_application_email: false,
+    receive_qq_notifications: true
   });
   const [saving, setSaving] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -81,6 +109,10 @@ export default function AdminsPage() {
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
   const [deleteUsername, setDeleteUsername] = useState<string>('');
   const [isBatchDelete, setIsBatchDelete] = useState(false);
+  const [showBatchPermissionModal, setShowBatchPermissionModal] = useState(false);
+  const [batchPermissions, setBatchPermissions] = useState<Partial<Permissions>>({});
+  const [batchReceiveComplaintEmail, setBatchReceiveComplaintEmail] = useState<boolean | null>(null);
+  const [batchReceiveApplicationEmail, setBatchReceiveApplicationEmail] = useState<boolean | null>(null);
 
   useEffect(() => {
     fetchAdmins();
@@ -178,8 +210,9 @@ export default function AdminsPage() {
     }
     
     const csvContent = [
-      ['用户名', '昵称', 'QQ', '角色', '展示设置', '创建时间'].join(','),
+      ['ID', '用户名', '昵称', 'QQ', '角色', '展示设置', '创建时间'].join(','),
       ...exportData.map(a => [
+        a.id,
         a.username,
         a.display_name || '-',
         a.qq || '-',
@@ -238,7 +271,9 @@ export default function AdminsPage() {
           display_name: formData.display_name,
           qq: formData.qq,
           show_in_contact: formData.show_in_contact,
-          show_in_logs: formData.show_in_logs
+          show_in_logs: formData.show_in_logs,
+          receive_complaint_email: formData.receive_complaint_email,
+          receive_application_email: formData.receive_application_email
         })
       });
       const result = await response.json();
@@ -266,7 +301,10 @@ export default function AdminsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: permissionAdmin.id,
-          permissions: permissionAdmin.permissions
+          permissions: permissionAdmin.permissions,
+          receive_complaint_email: permissionAdmin.receive_complaint_email,
+          receive_application_email: permissionAdmin.receive_application_email,
+          receive_qq_notifications: permissionAdmin.receive_qq_notifications
         })
       });
       const result = await response.json();
@@ -295,7 +333,9 @@ export default function AdminsPage() {
       is_owner: false,
       permissions: { ...defaultPermissions },
       show_in_contact: true,
-      show_in_logs: true
+      show_in_logs: true,
+      receive_complaint_email: false,
+      receive_application_email: false
     });
   };
 
@@ -309,7 +349,9 @@ export default function AdminsPage() {
       is_owner: admin.is_owner,
       permissions: admin.permissions || { ...defaultPermissions },
       show_in_contact: admin.show_in_contact,
-      show_in_logs: admin.show_in_logs
+      show_in_logs: admin.show_in_logs,
+      receive_complaint_email: admin.receive_complaint_email,
+      receive_application_email: admin.receive_application_email
     });
   };
 
@@ -332,11 +374,75 @@ export default function AdminsPage() {
     });
   };
 
+  const openBatchPermissionModal = () => {
+    setBatchPermissions({});
+    setBatchReceiveComplaintEmail(null);
+    setBatchReceiveApplicationEmail(null);
+    setShowBatchPermissionModal(true);
+  };
+
+  const toggleBatchPermission = (key: keyof Permissions) => {
+    setBatchPermissions(prev => ({
+      ...prev,
+      [key]: prev[key] === undefined ? true : (prev[key] === true ? false : undefined)
+    }));
+  };
+
+  const handleBatchUpdatePermissions = async () => {
+    if (selectedIds.size === 0) {
+      alert('请先选择要修改权限的管理员');
+      return;
+    }
+
+    setProcessing(true);
+    try {
+      for (const id of selectedIds) {
+        const admin = admins.find(a => a.id === id);
+        if (!admin) continue;
+
+        const updateData: any = { id };
+        
+        if (Object.keys(batchPermissions).length > 0) {
+          const newPermissions = { ...admin.permissions };
+          for (const [key, value] of Object.entries(batchPermissions)) {
+            if (value !== undefined) {
+              newPermissions[key as keyof Permissions] = value;
+            }
+          }
+          updateData.permissions = newPermissions;
+        }
+        
+        if (batchReceiveComplaintEmail !== null) {
+          updateData.receive_complaint_email = batchReceiveComplaintEmail;
+        }
+        
+        if (batchReceiveApplicationEmail !== null) {
+          updateData.receive_application_email = batchReceiveApplicationEmail;
+        }
+
+        await fetch('/api/admin/manage', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updateData)
+        });
+      }
+      
+      alert('批量修改权限成功');
+      setShowBatchPermissionModal(false);
+      fetchAdmins();
+    } catch (error) {
+      alert('批量修改权限失败，请重试');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleString('zh-CN', {
       year: 'numeric',
       month: '2-digit',
-      day: '2-digit'
+      day: '2-digit',
+      hour12: false
     });
   };
 
@@ -370,11 +476,18 @@ export default function AdminsPage() {
             📥 {selectedIds.size > 0 ? `导出选中 (${selectedIds.size})` : '导出全部'}
           </button>
           <button
+            onClick={openBatchPermissionModal}
+            disabled={selectedIds.size === 0 || processing}
+            className="px-4 py-2 rounded-lg font-medium bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white transition-all flex items-center gap-2"
+          >
+            🔐 批量权限 {selectedIds.size > 0 && `(${selectedIds.size})`}
+          </button>
+          <button
             onClick={handleBatchDelete}
             disabled={selectedIds.size === 0 || processing}
             className="px-4 py-2 rounded-lg font-medium bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white transition-all flex items-center gap-2"
           >
-            🗑️ 批量删除 {selectedIds.size > 0 && `(${selectedIds.size})`}
+            🗑️ 选中删除 {selectedIds.size > 0 && `(${selectedIds.size})`}
           </button>
         </div>
       )}
@@ -396,11 +509,11 @@ export default function AdminsPage() {
                     className="w-4 h-4 rounded bg-gray-700 border-gray-600 text-cyan-500 focus:ring-cyan-500"
                   />
                 </th>
+                <th className="text-left px-4 py-3 text-gray-400 font-medium">ID</th>
                 <th className="text-left px-4 py-3 text-gray-400 font-medium">用户名</th>
                 <th className="text-left px-4 py-3 text-gray-400 font-medium">昵称</th>
                 <th className="text-left px-4 py-3 text-gray-400 font-medium">QQ</th>
                 <th className="text-left px-4 py-3 text-gray-400 font-medium">角色</th>
-                <th className="text-left px-4 py-3 text-gray-400 font-medium">展示设置</th>
                 <th className="text-left px-4 py-3 text-gray-400 font-medium">操作</th>
               </tr>
             </thead>
@@ -417,6 +530,7 @@ export default function AdminsPage() {
                       />
                     )}
                   </td>
+                  <td className="px-4 py-3 text-gray-300 font-medium">{admin.username}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <span className={`w-8 h-8 rounded-full flex items-center justify-center text-lg ${
@@ -435,16 +549,6 @@ export default function AdminsPage() {
                     ) : (
                       <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs">管理员</span>
                     )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-col gap-1 text-xs">
-                      <span className={admin.show_in_contact ? 'text-green-400' : 'text-gray-500'}>
-                        {admin.show_in_contact ? '✓' : '✗'} 联系页面
-                      </span>
-                      <span className={admin.show_in_logs ? 'text-green-400' : 'text-gray-500'}>
-                        {admin.show_in_logs ? '✓' : '✗'} 操作日志
-                      </span>
-                    </div>
                   </td>
                   <td className="px-4 py-3">
                     {!admin.is_owner && (
@@ -655,23 +759,95 @@ export default function AdminsPage() {
               </button>
             </div>
             
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 gap-3">
-                {Object.entries(permissionLabels).map(([key, label]) => (
-                  <div key={key} className="flex items-center justify-between bg-gray-800/50 rounded-lg p-3">
-                    <span className="text-gray-300">{label}</span>
+            <div className="space-y-5">
+              {permissionCategories.map((category) => (
+                <div key={category.name} className="bg-gray-800/30 rounded-xl p-4">
+                  <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+                    {category.name}
+                  </h3>
+                  <div className="grid grid-cols-1 gap-2">
+                    {category.permissions.map((key) => (
+                      <div key={key} className="flex items-center justify-between bg-gray-700/50 rounded-lg p-3 hover:bg-gray-700/70 transition-colors">
+                        <span className="text-gray-300">{permissionLabels[key]}</span>
+                        <button
+                          onClick={() => togglePermission(key)}
+                          className={`px-3 py-1.5 rounded-lg text-sm transition-all font-medium ${
+                            permissionAdmin.permissions[key]
+                              ? 'bg-green-600/20 text-green-400 border border-green-600/30 hover:bg-green-600/30'
+                              : 'bg-gray-600 text-gray-400 border border-gray-500 hover:bg-gray-500'
+                          }`}
+                        >
+                          {permissionAdmin.permissions[key] ? '✓ 允许' : '✗ 禁止'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              <div className="bg-gray-800/30 rounded-xl p-4">
+                <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+                  📧 邮件通知设置
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between bg-gray-700/50 rounded-lg p-3 hover:bg-gray-700/70 transition-colors">
+                    <div>
+                      <span className="text-gray-300 block">接收投诉举报邮件</span>
+                      <span className="text-gray-500 text-xs">当有新的投诉举报时发送邮件通知</span>
+                    </div>
                     <button
-                      onClick={() => togglePermission(key as keyof Permissions)}
-                      className={`px-3 py-1 rounded-lg text-sm transition-all ${
-                        permissionAdmin.permissions[key as keyof Permissions]
-                          ? 'bg-green-600/20 text-green-400 border border-green-600/30'
-                          : 'bg-gray-700 text-gray-400 border border-gray-600'
+                      onClick={() => setPermissionAdmin({
+                        ...permissionAdmin,
+                        receive_complaint_email: !permissionAdmin.receive_complaint_email
+                      })}
+                      className={`px-3 py-1.5 rounded-lg text-sm transition-all font-medium ${
+                        permissionAdmin.receive_complaint_email
+                          ? 'bg-green-600/20 text-green-400 border border-green-600/30 hover:bg-green-600/30'
+                          : 'bg-gray-600 text-gray-400 border border-gray-500 hover:bg-gray-500'
                       }`}
                     >
-                      {permissionAdmin.permissions[key as keyof Permissions] ? '✓ 允许' : '✗ 禁止'}
+                      {permissionAdmin.receive_complaint_email ? '✓ 开启' : '✗ 关闭'}
                     </button>
                   </div>
-                ))}
+                  <div className="flex items-center justify-between bg-gray-700/50 rounded-lg p-3 hover:bg-gray-700/70 transition-colors">
+                    <div>
+                      <span className="text-gray-300 block">接收白名单申请邮件</span>
+                      <span className="text-gray-500 text-xs">当有新的白名单申请时发送邮件通知</span>
+                    </div>
+                    <button
+                      onClick={() => setPermissionAdmin({
+                        ...permissionAdmin,
+                        receive_application_email: !permissionAdmin.receive_application_email
+                      })}
+                      className={`px-3 py-1.5 rounded-lg text-sm transition-all font-medium ${
+                        permissionAdmin.receive_application_email
+                          ? 'bg-green-600/20 text-green-400 border border-green-600/30 hover:bg-green-600/30'
+                          : 'bg-gray-600 text-gray-400 border border-gray-500 hover:bg-gray-500'
+                      }`}
+                    >
+                      {permissionAdmin.receive_application_email ? '✓ 开启' : '✗ 关闭'}
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between bg-gray-700/50 rounded-lg p-3 hover:bg-gray-700/70 transition-colors">
+                    <div>
+                      <span className="text-gray-300 block">接收QQ机器人通知</span>
+                      <span className="text-gray-500 text-xs">当有新的白名单申请时发送QQ通知</span>
+                    </div>
+                    <button
+                      onClick={() => setPermissionAdmin({
+                        ...permissionAdmin,
+                        receive_qq_notifications: !permissionAdmin.receive_qq_notifications
+                      })}
+                      className={`px-3 py-1.5 rounded-lg text-sm transition-all font-medium ${
+                        permissionAdmin.receive_qq_notifications
+                          ? 'bg-green-600/20 text-green-400 border border-green-600/30 hover:bg-green-600/30'
+                          : 'bg-gray-600 text-gray-400 border border-gray-500 hover:bg-gray-500'
+                      }`}
+                    >
+                      {permissionAdmin.receive_qq_notifications ? '✓ 开启' : '✗ 关闭'}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
             
@@ -691,6 +867,134 @@ export default function AdminsPage() {
                 className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all disabled:opacity-50"
               >
                 {saving ? '保存中...' : '保存权限'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 批量权限修改弹窗 */}
+      {showBatchPermissionModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border-2 border-gray-700 rounded-2xl p-6 w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <span>🔐</span> 批量配置权限 ({selectedIds.size} 个管理员)
+              </h2>
+              <button
+                onClick={() => {
+                  setShowBatchPermissionModal(false);
+                }}
+                className="text-gray-400 hover:text-white text-2xl"
+              >
+                ×
+              </button>
+            </div>
+            
+            <p className="text-gray-400 text-sm mb-4">
+              提示：点击权限按钮可切换三种状态：不修改 → 允许 → 禁止
+            </p>
+            
+            <div className="space-y-5">
+              {permissionCategories.map((category) => (
+                <div key={category.name} className="bg-gray-800/30 rounded-xl p-4">
+                  <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+                    {category.name}
+                  </h3>
+                  <div className="grid grid-cols-1 gap-2">
+                    {category.permissions.map((key) => {
+                      const state = batchPermissions[key];
+                      let buttonClass = 'bg-gray-600 text-gray-400 border border-gray-500 hover:bg-gray-500';
+                      let buttonText = '━ 不修改';
+                      
+                      if (state === true) {
+                        buttonClass = 'bg-green-600/20 text-green-400 border border-green-600/30 hover:bg-green-600/30';
+                        buttonText = '✓ 允许';
+                      } else if (state === false) {
+                        buttonClass = 'bg-red-600/20 text-red-400 border border-red-600/30 hover:bg-red-600/30';
+                        buttonText = '✗ 禁止';
+                      }
+                      
+                      return (
+                        <div key={key} className="flex items-center justify-between bg-gray-700/50 rounded-lg p-3 hover:bg-gray-700/70 transition-colors">
+                          <span className="text-gray-300">{permissionLabels[key]}</span>
+                          <button
+                            onClick={() => toggleBatchPermission(key)}
+                            className={`px-3 py-1.5 rounded-lg text-sm transition-all font-medium ${buttonClass}`}
+                          >
+                            {buttonText}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+
+              <div className="bg-gray-800/30 rounded-xl p-4">
+                <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+                  📧 邮件通知设置
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between bg-gray-700/50 rounded-lg p-3 hover:bg-gray-700/70 transition-colors">
+                    <div>
+                      <span className="text-gray-300 block">接收投诉举报邮件</span>
+                      <span className="text-gray-500 text-xs">当有新的投诉举报时发送邮件通知</span>
+                    </div>
+                    <button
+                      onClick={() => setBatchReceiveComplaintEmail(
+                        batchReceiveComplaintEmail === null ? true : (batchReceiveComplaintEmail === true ? false : null)
+                      )}
+                      className={`px-3 py-1.5 rounded-lg text-sm transition-all font-medium ${
+                        batchReceiveComplaintEmail === null
+                          ? 'bg-gray-600 text-gray-400 border border-gray-500 hover:bg-gray-500'
+                          : batchReceiveComplaintEmail
+                          ? 'bg-green-600/20 text-green-400 border border-green-600/30 hover:bg-green-600/30'
+                          : 'bg-red-600/20 text-red-400 border border-red-600/30 hover:bg-red-600/30'
+                      }`}
+                    >
+                      {batchReceiveComplaintEmail === null ? '━ 不修改' : (batchReceiveComplaintEmail ? '✓ 开启' : '✗ 关闭')}
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between bg-gray-700/50 rounded-lg p-3 hover:bg-gray-700/70 transition-colors">
+                    <div>
+                      <span className="text-gray-300 block">接收白名单申请邮件</span>
+                      <span className="text-gray-500 text-xs">当有新的白名单申请时发送邮件通知</span>
+                    </div>
+                    <button
+                      onClick={() => setBatchReceiveApplicationEmail(
+                        batchReceiveApplicationEmail === null ? true : (batchReceiveApplicationEmail === true ? false : null)
+                      )}
+                      className={`px-3 py-1.5 rounded-lg text-sm transition-all font-medium ${
+                        batchReceiveApplicationEmail === null
+                          ? 'bg-gray-600 text-gray-400 border border-gray-500 hover:bg-gray-500'
+                          : batchReceiveApplicationEmail
+                          ? 'bg-green-600/20 text-green-400 border border-green-600/30 hover:bg-green-600/30'
+                          : 'bg-red-600/20 text-red-400 border border-red-600/30 hover:bg-red-600/30'
+                      }`}
+                    >
+                      {batchReceiveApplicationEmail === null ? '━ 不修改' : (batchReceiveApplicationEmail ? '✓ 开启' : '✗ 关闭')}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowBatchPermissionModal(false);
+                }}
+                className="flex-1 px-4 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-xl transition-all"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleBatchUpdatePermissions}
+                disabled={processing}
+                className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all disabled:opacity-50"
+              >
+                {processing ? '保存中...' : '保存权限'}
               </button>
             </div>
           </div>

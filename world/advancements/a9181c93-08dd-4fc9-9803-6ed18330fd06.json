@@ -1,0 +1,39 @@
+{
+  "minecraft:nether/explore_nether": {
+    "criteria": {
+      "minecraft:crimson_forest": "2024-07-08 15:08:08 +0800"
+    },
+    "done": false
+  },
+  "minecraft:nether/root": {
+    "criteria": {
+      "entered_nether": "2024-07-08 15:08:07 +0800"
+    },
+    "done": true
+  },
+  "minecraft:story/enter_the_nether": {
+    "criteria": {
+      "entered_nether": "2024-07-08 15:08:07 +0800"
+    },
+    "done": true
+  },
+  "minecraft:recipes/decorations/crafting_table": {
+    "criteria": {
+      "unlock_right_away": "2024-07-08 15:08:07 +0800"
+    },
+    "done": true
+  },
+  "ams:craftable_elytra": {
+    "criteria": {
+      "tick": "2024-07-08 15:08:07 +0800"
+    },
+    "done": true
+  },
+  "ams:root": {
+    "criteria": {
+      "tick": "2024-07-08 15:08:07 +0800"
+    },
+    "done": true
+  },
+  "DataVersion": 3953
+}

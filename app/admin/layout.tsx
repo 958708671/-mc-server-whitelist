@@ -3,6 +3,40 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
+function DbErrorNotification({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+      <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border-2 border-orange-500/50 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-pulse">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center text-2xl">
+            ⚠️
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-white">数据库连接失败</h2>
+            <p className="text-orange-400 text-sm">已自动切换到模拟数据库</p>
+          </div>
+        </div>
+        
+        <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-4 mb-4">
+          <p className="text-gray-300 text-sm leading-relaxed">
+            系统检测到无法连接到真实数据库，已自动为您开启<strong className="text-orange-400">模拟数据库模式</strong>。
+          </p>
+          <p className="text-gray-400 text-xs mt-2">
+            在此模式下，所有数据仅保存在内存中，重启后将丢失。请检查数据库连接配置。
+          </p>
+        </div>
+        
+        <button
+          onClick={onClose}
+          className="w-full px-4 py-3 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white rounded-xl transition-all font-medium"
+        >
+          我知道了
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function PasswordModal({ adminId, onClose }: { adminId: number; onClose: () => void }) {
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -137,9 +171,12 @@ export default function AdminLayout({
     user: string;
     adminId: number;
     isOwner: boolean;
+    qq?: string;
   } | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [mockDbEnabled, setMockDbEnabled] = useState(false);
+  const [showDbErrorNotification, setShowDbErrorNotification] = useState(false);
 
   useEffect(() => {
     const savedAdmin = localStorage.getItem('adminInfo');
@@ -154,6 +191,45 @@ export default function AdminLayout({
       window.location.href = '/';
     }
   }, []);
+
+  useEffect(() => {
+    fetch('/api/dev/mock-db')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setMockDbEnabled(data.mockDatabase);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // 检查数据库连接状态
+  useEffect(() => {
+    fetch('/api/db-status')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.shouldShowNotification) {
+          setShowDbErrorNotification(true);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const toggleMockDb = async () => {
+    try {
+      const response = await fetch('/api/dev/mock-db', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: !mockDbEnabled })
+      });
+      const result = await response.json();
+      if (result.success) {
+        setMockDbEnabled(!mockDbEnabled);
+      }
+    } catch (error) {
+      console.error('切换失败:', error);
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('adminInfo');
@@ -232,11 +308,35 @@ export default function AdminLayout({
                   管理后台
                 </h1>
                 <div className="flex items-center gap-2 mt-2">
-                  <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg flex items-center justify-center text-sm font-bold text-white">
-                    {adminInfo.user.charAt(0).toUpperCase()}
+                  <div className="w-8 h-8 bg-white border-2 border-gray-600 rounded-lg overflow-hidden flex items-center justify-center">
+                    {adminInfo.qq ? (
+                      <img
+                        src={`https://q.qlogo.cn/g?b=qq&nk=${adminInfo.qq}&s=100`}
+                        alt="QQ头像"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                          const parent = target.parentElement;
+                          if (parent) {
+                            const fallback = document.createElement('div');
+                            fallback.className = 'w-full h-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-sm font-bold text-white';
+                            fallback.textContent = adminInfo.user.charAt(0).toUpperCase();
+                            parent.appendChild(fallback);
+                          }
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-sm font-bold text-white">
+                        {adminInfo.user.charAt(0).toUpperCase()}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <p className="text-sm text-gray-300">{adminInfo.user}</p>
+                    {adminInfo.qq && (
+                      <p className="text-xs text-gray-400">QQ: {adminInfo.qq}</p>
+                    )}
                     {adminInfo.isOwner && (
                       <span className="inline-block px-2 py-0.5 bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-400 text-xs rounded border border-amber-500/30">
                         👑 服主
@@ -289,6 +389,23 @@ export default function AdminLayout({
         </nav>
 
         <div className="p-3 border-t-2 border-gray-700 space-y-2 flex-shrink-0">
+          {!sidebarCollapsed && (
+            <div className="flex items-center justify-between px-3 py-2 bg-gray-800/50 rounded-xl mb-2">
+              <span className="text-xs text-gray-400">🧪 模拟数据库</span>
+              <button
+                onClick={toggleMockDb}
+                className={`relative w-10 h-5 rounded-full transition-colors ${
+                  mockDbEnabled ? 'bg-orange-500' : 'bg-gray-600'
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
+                    mockDbEnabled ? 'left-5' : 'left-0.5'
+                  }`}
+                />
+              </button>
+            </div>
+          )}
           <Link
             href="/"
             className="w-full flex items-center justify-center space-x-2 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-xl transition-all text-sm"
@@ -321,6 +438,12 @@ export default function AdminLayout({
         <PasswordModal 
           adminId={adminInfo.adminId}
           onClose={() => setShowPasswordModal(false)}
+        />
+      )}
+
+      {showDbErrorNotification && (
+        <DbErrorNotification 
+          onClose={() => setShowDbErrorNotification(false)}
         />
       )}
     </div>

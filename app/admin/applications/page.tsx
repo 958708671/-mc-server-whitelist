@@ -1,19 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-
-interface Application {
-  id: number;
-  minecraft_id: string;
-  age: number | null;
-  contact: string;
-  reason: string;
-  status: string;
-  reviewed_by: string | null;
-  review_note: string | null;
-  created_at: string;
-  reviewed_at: string | null;
-}
+import { Application, AdminInfo } from './types';
+import { formatDate, exportToCsv } from './utils';
+import BlacklistModal from '../components/BlacklistModal';
 
 export default function ApplicationsPage() {
   const [applications, setApplications] = useState<Application[]>([]);
@@ -22,8 +12,11 @@ export default function ApplicationsPage() {
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
   const [reviewNote, setReviewNote] = useState('');
   const [processing, setProcessing] = useState(false);
-  const [adminInfo, setAdminInfo] = useState<{ user: string; adminId: number } | null>(null);
+  const [adminInfo, setAdminInfo] = useState<AdminInfo | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [blacklistingId, setBlacklistingId] = useState<number | null>(null);
+  const [showBlacklistModal, setShowBlacklistModal] = useState(false);
+  const [blacklistTarget, setBlacklistTarget] = useState<Application | null>(null);
 
   useEffect(() => {
     const savedAdmin = localStorage.getItem('adminInfo');
@@ -32,6 +25,16 @@ export default function ApplicationsPage() {
     }
     fetchApplications();
   }, [activeTab]);
+
+  useEffect(() => {
+    if (processing) {
+      const timeout = setTimeout(() => {
+        console.log('安全重置processing');
+        setProcessing(false);
+      }, 15000);
+      return () => clearTimeout(timeout);
+    }
+  }, [processing]);
 
   const fetchApplications = async () => {
     setLoading(true);
@@ -135,34 +138,18 @@ export default function ApplicationsPage() {
       ? applications.filter(app => selectedIds.has(app.id))
       : applications;
     
-    if (exportData.length === 0) {
-      alert('没有可导出的数据');
-      return;
-    }
-    
-    const csvContent = [
-      ['游戏ID', '年龄', '联系方式', '申请理由', '状态', '申请时间'].join(','),
-      ...exportData.map(app => [
-        app.minecraft_id,
-        app.age || '未填写',
-        app.contact,
-        (app.reason || '').replace(/"/g, '""'),
-        app.status === 'pending' ? '待审核' : app.status === 'approved' ? '已通过' : '已拒绝',
-        formatDate(app.created_at)
-      ].map(field => `"${field}"`).join(','))
-    ].join('\n');
-    
-    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `白名单申请_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.csv`;
-    link.click();
+    exportToCsv(exportData, `白名单申请_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.csv`);
   };
 
   const handleReview = async (appId: number, status: 'approved' | 'rejected') => {
     if (!adminInfo) return;
     
     setProcessing(true);
+    let message = '';
+    
+    // 立即关闭弹窗
+    setSelectedApp(null);
+    
     try {
       const response = await fetch(`/api/applications/${appId}`, {
         method: 'PATCH',
@@ -175,29 +162,84 @@ export default function ApplicationsPage() {
         })
       });
       
+      if (!response.ok) {
+        throw new Error('网络请求失败');
+      }
+      
       const result = await response.json();
       if (result.success) {
-        setSelectedApp(null);
-        setReviewNote('');
+        message = status === 'approved' ? '审核通过成功' : '审核拒绝成功';
+        // 如果是审核通过，显示白名单添加结果
+        if (status === 'approved' && result.whitelistResult) {
+          const whitelistMsg = result.whitelistResult.success 
+            ? `白名单添加成功: ${result.whitelistResult.message}`
+            : `白名单添加失败: ${result.whitelistResult.message}`;
+          message += `\n${whitelistMsg}`;
+        }
+      } else {
+        message = result.message || '操作失败';
+      }
+    } catch (error) {
+      console.error('操作失败:', error);
+      message = '操作失败，请重试';
+    } finally {
+      setReviewNote('');
+      setProcessing(false);
+      // 强制刷新页面
+      setTimeout(() => {
+        fetchApplications();
+        console.log('申请列表已刷新');
+      }, 100);
+      if (message) {
+        setTimeout(() => alert(message), 200);
+      }
+    }
+  };
+
+  const handleAddToBlacklistClick = (app: Application) => {
+    setBlacklistTarget(app);
+    setShowBlacklistModal(true);
+  };
+
+  const handleBlacklistConfirm = async (reason: string, duration: number | null, isPermanent: boolean) => {
+    if (!blacklistTarget) return;
+    
+    const app = blacklistTarget;
+    setShowBlacklistModal(false);
+    setBlacklistingId(app.id);
+    
+    try {
+      const response = await fetch('/api/blacklist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          minecraft_id: app.minecraft_id,
+          ip_address: app.ip_address,
+          reason: reason,
+          banned_by: adminInfo?.user || '管理员',
+          banned_by_id: adminInfo?.adminId,
+          application_id: app.id,
+          duration: duration,
+          is_permanent: isPermanent
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        const durationText = isPermanent ? '永久' : duration ? `${Math.round(duration / 1440)}天` : '永久';
+        alert(`已拉入黑名单并封禁IP\n\n游戏ID：${app.minecraft_id}\nIP地址：${app.ip_address || '未知'}\n封禁原因：${reason}\n封禁时长：${durationText}\n\n服务器封禁结果：${result.banResult?.message || '未执行'}`);
         fetchApplications();
       } else {
         alert(result.message || '操作失败');
       }
     } catch (error) {
+      console.error('拉黑操作失败:', error);
       alert('操作失败，请重试');
     } finally {
-      setProcessing(false);
+      setBlacklistingId(null);
+      setBlacklistTarget(null);
     }
-  };
-
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleString('zh-CN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
   };
 
   const getStatusBadge = (status: string) => {
@@ -253,23 +295,23 @@ export default function ApplicationsPage() {
             onClick={handleExport}
             className="px-4 py-2 rounded-lg font-medium bg-emerald-600 hover:bg-emerald-700 text-white transition-all flex items-center gap-2"
           >
-            📥 {selectedIds.size > 0 ? `导出选中 (${selectedIds.size})` : '导出全部'}
+            📥 {selectedIds.size > 0 ? `选中导出 (${selectedIds.size})` : '导出全部'}
           </button>
           {activeTab === 'pending' && (
             <>
               <button
                 onClick={handleBatchApprove}
                 disabled={selectedIds.size === 0 || processing}
-                className="px-4 py-2 rounded-lg font-medium bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white transition-all flex items-center gap-2"
+                className={`px-4 py-2 rounded-lg font-medium bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white transition-all flex items-center gap-2`}
               >
-                ✅ 批量通过 {selectedIds.size > 0 && `(${selectedIds.size})`}
+                {processing ? '处理中...' : <>✅ 选中通过 {selectedIds.size > 0 && `(${selectedIds.size})`}</>}
               </button>
               <button
                 onClick={handleBatchReject}
                 disabled={selectedIds.size === 0 || processing}
-                className="px-4 py-2 rounded-lg font-medium bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white transition-all flex items-center gap-2"
+                className={`px-4 py-2 rounded-lg font-medium bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white transition-all flex items-center gap-2`}
               >
-                ❌ 批量拒绝 {selectedIds.size > 0 && `(${selectedIds.size})`}
+                {processing ? '处理中...' : <>❌ 选中拒绝 {selectedIds.size > 0 && `(${selectedIds.size})`}</>}
               </button>
             </>
           )}
@@ -305,7 +347,6 @@ export default function ApplicationsPage() {
                 <th className="text-left px-4 py-3 text-gray-400 font-medium text-sm">游戏ID</th>
                 <th className="text-left px-4 py-3 text-gray-400 font-medium text-sm">年龄</th>
                 <th className="text-left px-4 py-3 text-gray-400 font-medium text-sm">联系方式</th>
-                <th className="text-left px-4 py-3 text-gray-400 font-medium text-sm">申请理由</th>
                 <th className="text-left px-4 py-3 text-gray-400 font-medium text-sm">状态</th>
                 <th className="text-left px-4 py-3 text-gray-400 font-medium text-sm">操作</th>
               </tr>
@@ -326,19 +367,27 @@ export default function ApplicationsPage() {
                   <td className="px-4 py-3 text-white font-medium">{app.minecraft_id}</td>
                   <td className="px-4 py-3 text-gray-300">{app.age || '-'}</td>
                   <td className="px-4 py-3 text-gray-300">{app.contact}</td>
-                  <td className="px-4 py-3 text-gray-400 text-sm max-w-xs truncate">{app.reason}</td>
                   <td className="px-4 py-3">{getStatusBadge(app.status)}</td>
                   <td className="px-4 py-3">
                     {app.status === 'pending' && (
-                      <button
-                        onClick={() => {
-                          setSelectedApp(app);
-                          setReviewNote('');
-                        }}
-                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all text-sm"
-                      >
-                        审核
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setSelectedApp(app);
+                            setReviewNote('');
+                          }}
+                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all text-sm"
+                        >
+                          审核
+                        </button>
+                        <button
+                          onClick={() => handleAddToBlacklistClick(app)}
+                          disabled={blacklistingId === app.id}
+                          className="px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-lg transition-all text-sm"
+                        >
+                          {blacklistingId === app.id ? '处理中...' : '拉黑'}
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>
@@ -377,18 +426,77 @@ export default function ApplicationsPage() {
                   <span className="text-gray-400">联系方式</span>
                   <span className="text-white">{selectedApp.contact}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">申请时间</span>
-                  <span className="text-white">{formatDate(selectedApp.created_at)}</span>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* 游戏经验相关 */}
+                <div className="bg-blue-900/20 border border-blue-700/50 rounded-lg p-4">
+                  <h3 className="text-lg font-bold text-blue-300 mb-3">游戏经验</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">游戏时间</span>
+                      <span className="text-white">{selectedApp.play_time || 0} 个月</span>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* 个人信息相关 */}
+                <div className="bg-purple-900/20 border border-purple-700/50 rounded-lg p-4">
+                  <h3 className="text-lg font-bold text-purple-300 mb-3">个人信息</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">性别</span>
+                      <span className="text-white">{selectedApp.gender || '未填写'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">如何知道服务器</span>
+                      <span className="text-white">{selectedApp.how_found || '未填写'}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
               
-              <div>
-                <label className="block text-gray-300 text-sm mb-2 font-medium">申请理由</label>
-                <div className="bg-gray-800/50 rounded-xl p-4 text-gray-300 whitespace-pre-wrap">
-                  {selectedApp.reason || '未填写'}
+              {/* 答题相关 */}
+              {selectedApp.quiz_category && (
+                <div className="bg-green-900/20 border border-green-700/50 rounded-lg p-4">
+                  <h3 className="text-lg font-bold text-green-300 mb-3">答题信息</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">答题类别</span>
+                      <span className="text-white">{selectedApp.quiz_category}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">答题得分</span>
+                      <span className="text-white">{selectedApp.quiz_score || 0} / {selectedApp.quiz_total || 0}</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
+              
+              {/* 其他信息 */}
+              {selectedApp.server_experience || selectedApp.griefing_history || selectedApp.additional_info && (
+                <div className="bg-amber-900/20 border border-amber-700/50 rounded-lg p-4">
+                  <h3 className="text-lg font-bold text-amber-300 mb-3">其他信息</h3>
+                  {selectedApp.server_experience && (
+                    <div className="mb-3">
+                      <div className="text-gray-400 mb-1">服务器经验</div>
+                      <div className="text-white text-sm">{selectedApp.server_experience}</div>
+                    </div>
+                  )}
+                  {selectedApp.griefing_history && (
+                    <div className="mb-3">
+                      <div className="text-gray-400 mb-1">破坏行为历史</div>
+                      <div className="text-white text-sm">{selectedApp.griefing_history}</div>
+                    </div>
+                  )}
+                  {selectedApp.additional_info && (
+                    <div>
+                      <div className="text-gray-400 mb-1">其他信息</div>
+                      <div className="text-white text-sm">{selectedApp.additional_info}</div>
+                    </div>
+                  )}
+                </div>
+              )}
               
               <div>
                 <label className="block text-gray-300 text-sm mb-2 font-medium">审核备注</label>
@@ -412,20 +520,34 @@ export default function ApplicationsPage() {
               <button
                 onClick={() => handleReview(selectedApp.id, 'rejected')}
                 disabled={processing}
-                className="flex-1 px-4 py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                className={`flex-1 px-4 py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2`}
               >
-                <span>❌</span> 拒绝
+                {processing ? '处理中...' : <><span>❌</span> 拒绝</>}
               </button>
               <button
                 onClick={() => handleReview(selectedApp.id, 'approved')}
                 disabled={processing}
-                className="flex-1 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                className={`flex-1 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2`}
               >
-                <span>✅</span> 通过
+                {processing ? '处理中...' : <><span>✅</span> 通过</>}
               </button>
             </div>
           </div>
         </div>
+      )}
+
+      {showBlacklistModal && blacklistTarget && (
+        <BlacklistModal
+          isOpen={showBlacklistModal}
+          onClose={() => {
+            setShowBlacklistModal(false);
+            setBlacklistTarget(null);
+          }}
+          onConfirm={handleBlacklistConfirm}
+          minecraftId={blacklistTarget.minecraft_id}
+          ipAddress={blacklistTarget.ip_address}
+          loading={blacklistingId !== null}
+        />
       )}
     </div>
   );

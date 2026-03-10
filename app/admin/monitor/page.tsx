@@ -106,6 +106,7 @@ export default function AdminMonitorPage() {
                       <span className="text-white font-medium text-lg">
                         {admin.display_name || admin.username}
                       </span>
+                      <span className="text-gray-400 text-sm">ID: {admin.username}</span>
                       {admin.is_owner && (
                         <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs rounded">
                           服主
@@ -118,7 +119,7 @@ export default function AdminMonitorPage() {
                       <div className="flex items-center text-sm">
                         <span className="text-gray-500 w-16">最后登录</span>
                         <span className="text-gray-300">
-                          {lastLogin ? new Date(lastLogin.created_at).toLocaleString('zh-CN') : '从未登录'}
+                          {lastLogin ? new Date(lastLogin.created_at).toLocaleString('zh-CN', { hour12: false }) : '从未登录'}
                         </span>
                       </div>
                       <div className="flex items-center text-sm">
@@ -168,11 +169,14 @@ export default function AdminMonitorPage() {
                           alt={record.admin_name}
                           className="w-8 h-8 rounded-full"
                         />
+                        <div>
                         <span className="text-white">{record.admin_name}</span>
+                        <span className="text-gray-500 text-xs ml-2">ID: {record.admin_name}</span>
+                      </div>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-gray-300 text-sm">
-                      {new Date(record.created_at).toLocaleString('zh-CN')}
+                      {new Date(record.created_at).toLocaleString('zh-CN', { hour12: false })}
                     </td>
                     <td className="px-4 py-3 text-gray-400 text-sm font-mono">
                       {record.ip_address || 'unknown'}

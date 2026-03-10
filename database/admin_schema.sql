@@ -23,6 +23,10 @@ CREATE TABLE IF NOT EXISTS admins (
   -- 展示设置
   show_in_contact BOOLEAN DEFAULT TRUE,
   show_in_logs BOOLEAN DEFAULT TRUE,
+  -- 通知设置
+  receive_complaint_email BOOLEAN DEFAULT TRUE,
+  receive_application_email BOOLEAN DEFAULT TRUE,
+  receive_qq_notifications BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

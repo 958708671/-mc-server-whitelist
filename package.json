@@ -12,6 +12,7 @@
     "@neondatabase/serverless": "^1.0.2",
     "next": "16.1.6",
     "nodemailer": "^8.0.1",
+    "rcon-client": "^4.2.5",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },
