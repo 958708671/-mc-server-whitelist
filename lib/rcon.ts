@@ -1,5 +1,3 @@
-import { createSocket, Socket } from 'net';
-
 interface RconOptions {
   host: string;
   port: number;
@@ -13,23 +11,25 @@ interface RconResponse {
 }
 
 class Rcon {
-  private socket: Socket | null = null;
+  private socket: any = null;
   private host: string;
   private port: number;
   private password: string;
   private connected: boolean = false;
   private authenticated: boolean = false;
   private requestId: number = 0;
+  private net: any;
 
   constructor(options: RconOptions) {
     this.host = options.host;
     this.port = options.port;
     this.password = options.password;
+    this.net = require('net');
   }
 
   async connect(): Promise<void> {
     return new Promise((resolve, reject) => {
-      this.socket = createSocket('tcp');
+      this.socket = this.net.createSocket('tcp');
       
       const timeout = setTimeout(() => {
         this.socket?.destroy();
@@ -42,7 +42,7 @@ class Rcon {
         resolve();
       });
 
-      this.socket.on('error', (err) => {
+      this.socket.on('error', (err: any) => {
         clearTimeout(timeout);
         reject(new Error(`连接错误: ${err.message}`));
       });
@@ -104,7 +104,7 @@ class Rcon {
         responseData = Buffer.concat([responseData, data]);
         
         try {
-          const response = this.parsePacket(responseData);
+          const response = this.parsePacket(data);
           clearTimeout(timeout);
           this.socket?.off('data', onData);
           resolve(response.body);

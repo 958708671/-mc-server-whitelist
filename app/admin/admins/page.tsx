@@ -337,6 +337,7 @@ export default function AdminsPage() {
       show_in_contact: true,
       show_in_logs: true,
       receive_complaint_email: false,
+      receive_qq_notifications: false,
       receive_application_email: false
     });
   };
@@ -353,6 +354,7 @@ export default function AdminsPage() {
       show_in_contact: admin.show_in_contact,
       show_in_logs: admin.show_in_logs,
       receive_complaint_email: admin.receive_complaint_email,
+      receive_qq_notifications: admin.receive_qq_notifications,
       receive_application_email: admin.receive_application_email
     });
   };
