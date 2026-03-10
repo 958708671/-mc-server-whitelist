@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const data = await request.json();
-    const { id, password, display_name, qq, permissions, show_in_contact, show_in_logs } = data;
+    const { id, username, password, display_name, qq, permissions, show_in_contact, show_in_logs } = data;
     
     if (!id) {
       return NextResponse.json(
@@ -97,6 +97,24 @@ export async function PATCH(request: NextRequest) {
     const updates: string[] = [];
     const values: any[] = [];
     let paramIndex = 1;
+    
+    if (username) {
+      // 检查用户名是否已存在
+      const existing = await sql`
+        SELECT id FROM admins WHERE username = ${username} AND id != ${parseInt(id)}
+      `;
+      
+      if (existing.length > 0) {
+        return NextResponse.json(
+          { success: false, message: '该用户名已存在' },
+          { status: 400 }
+        );
+      }
+      
+      updates.push(`username = $${paramIndex}`);
+      values.push(username);
+      paramIndex++;
+    }
     
     if (password) {
       updates.push(`password = $${paramIndex}`);

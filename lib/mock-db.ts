@@ -26,54 +26,7 @@ interface OperationLog {
 }
 
 // 模拟管理员数据
-const mockAdmins: MockAdmin[] = [
-  {
-    id: 1,
-    username: '958708671',
-    password: '95870867120260308',
-    qq: '958708671',
-    display_name: '服主',
-    is_owner: true,
-    permissions: {
-      whitelist_review: true,
-      complaint_handle: true,
-      blacklist_manage: true,
-      announcement_manage: true,
-      event_manage: true,
-      statistics_view: true,
-      settings_view: true,
-      website_edit: true,
-      admin_manage: true,
-      logs_view: true,
-      monitor_view: true
-    },
-    show_in_contact: true,
-    show_in_logs: true
-  },
-  {
-    id: 2,
-    username: '2801699303',
-    password: '280169930320260308',
-    qq: '2801699303',
-    display_name: 'fly_yu',
-    is_owner: false,
-    permissions: {
-      whitelist_review: true,
-      complaint_handle: true,
-      blacklist_manage: true,
-      announcement_manage: true,
-      event_manage: true,
-      statistics_view: true,
-      settings_view: false,
-      website_edit: false,
-      admin_manage: false,
-      logs_view: false,
-      monitor_view: false
-    },
-    show_in_contact: true,
-    show_in_logs: true
-  }
-];
+export const mockAdmins: MockAdmin[] = [];
 
 // 模拟服务器设置存储
 export const mockServerSettings: Record<string, string> = {
@@ -97,6 +50,9 @@ export const mockEvents: any[] = [];
 
 // 模拟黑名单数据
 export const mockBlacklist: any[] = [];
+
+// 被删除的管理员ID列表（用于白名单列表过滤）
+const deletedAdminIds: number[] = [];
 
 // 操作日志
 const operationLogs: OperationLog[] = [];
@@ -384,4 +340,21 @@ export function setLastSyncTime(time: Date) {
 // 获取上次同步时间
 export function getLastSyncTime(): Date | null {
   return lastSyncTime;
+}
+
+// 添加被删除的管理员ID
+export function addDeletedAdminId(adminId: number) {
+  if (!deletedAdminIds.includes(adminId)) {
+    deletedAdminIds.push(adminId);
+  }
+}
+
+// 检查管理员是否被删除
+export function isAdminDeleted(adminId: number): boolean {
+  return deletedAdminIds.includes(adminId);
+}
+
+// 清空被删除的管理员ID列表
+export function clearDeletedAdminIds() {
+  deletedAdminIds.length = 0;
 }

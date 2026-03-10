@@ -1,6 +1,7 @@
 // API路由 - 数据库同步
 import { NextRequest, NextResponse } from 'next/server';
 import { syncFromRealToMock, syncFromMockToReal, getSyncState, checkDbConnection } from '@/lib/db-sync';
+import { getOperationLogs } from '@/lib/mock-db';
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,11 +11,13 @@ export async function GET(request: NextRequest) {
       case 'status':
         const state = getSyncState();
         const isConnected = await checkDbConnection();
+        const logs = getOperationLogs();
         return NextResponse.json({
           success: true,
           data: {
             ...state,
-            isConnected
+            isConnected,
+            pendingSyncCount: logs.length
           }
         });
         

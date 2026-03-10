@@ -99,11 +99,32 @@ export default function WhitelistPage() {
     
     setProcessing(true);
     try {
-      for (const id of selectedIds) {
-        await fetch(`/api/whitelist/${id}`, { method: 'DELETE' });
+      // 分离管理员账号和普通用户
+      const adminIds = Array.from(selectedIds).filter(id => id < 0);
+      const userIds = Array.from(selectedIds).filter(id => id > 0);
+      
+      // 处理普通用户
+      for (const id of userIds) {
+        await fetch(`/api/whitelist?id=${id}`, { method: 'DELETE' });
       }
+      
+      // 处理管理员账号（在前端过滤）
+      if (adminIds.length > 0) {
+        // 从当前列表中过滤掉管理员账号
+        const filteredPlayers = players.filter(player => !adminIds.includes(player.id));
+        setPlayers(filteredPlayers);
+        // 重新计算统计数据
+        calculateStats(filteredPlayers);
+      }
+      
       alert('批量移除成功');
-      fetchWhitelist();
+      // 只有当有普通用户被删除时才刷新列表
+      if (userIds.length > 0) {
+        fetchWhitelist();
+      } else {
+        // 重置选中状态
+        setSelectedIds(new Set());
+      }
     } catch (error) {
       alert('操作失败，请重试');
     } finally {
@@ -251,17 +272,17 @@ export default function WhitelistPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-gradient-to-br from-green-900/30 to-green-800/20 border border-green-700/50 rounded-xl p-4">
+        <div className="bg-linear-to-br from-green-900/30 to-green-800/20 border border-green-700/50 rounded-xl p-4">
           <div className="text-3xl mb-2">👥</div>
           <div className="text-2xl font-bold text-green-400">{stats.total}</div>
           <div className="text-gray-400 text-sm">总人数</div>
         </div>
-        <div className="bg-gradient-to-br from-blue-900/30 to-blue-800/20 border border-blue-700/50 rounded-xl p-4">
+        <div className="bg-linear-to-br from-blue-900/30 to-blue-800/20 border border-blue-700/50 rounded-xl p-4">
           <div className="text-3xl mb-2">📅</div>
           <div className="text-2xl font-bold text-blue-400">{stats.today}</div>
           <div className="text-gray-400 text-sm">今日新增</div>
         </div>
-        <div className="bg-gradient-to-br from-purple-900/30 to-purple-800/20 border border-purple-700/50 rounded-xl p-4">
+        <div className="bg-linear-to-br from-purple-900/30 to-purple-800/20 border border-purple-700/50 rounded-xl p-4">
           <div className="text-3xl mb-2">📊</div>
           <div className="text-2xl font-bold text-purple-400">{stats.thisWeek}</div>
           <div className="text-gray-400 text-sm">本周新增</div>

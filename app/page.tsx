@@ -181,7 +181,7 @@ const SponsorModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => voi
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50" onClick={onClose}>
       <div 
-        className={`bg-gradient-to-br ${bgFrom} ${bgTo} p-6 rounded-2xl border-2 ${borderColor} shadow-2xl max-w-md mx-4`} 
+        className={`bg-linear-to-br ${bgFrom} ${bgTo} p-6 rounded-2xl border-2 ${borderColor} shadow-2xl max-w-md mx-4`} 
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-6">
@@ -319,14 +319,14 @@ const ContactAdminModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () =
 
   return (
     <div 
-      className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9999] overflow-y-auto py-8" 
+      className="fixed inset-0 bg-black/80 flex items-center justify-center z-9999 overflow-y-auto py-8" 
       onClick={onClose}
     >
       <div 
-        className="bg-gradient-to-br from-blue-50 to-blue-100 p-6 md:p-8 rounded-2xl border-2 border-blue-200 shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] flex flex-col" 
+        className="bg-linear-to-br from-blue-50 to-blue-100 p-6 md:p-8 rounded-2xl border-2 border-blue-200 shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] flex flex-col" 
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex-shrink-0 flex justify-between items-center mb-6 pb-4 border-b border-blue-300">
+        <div className="shrink-0 flex justify-between items-center mb-6 pb-4 border-b border-blue-300">
           <h3 className="text-2xl md:text-3xl font-bold text-blue-800">联系管理团队</h3>
           <button 
             onClick={onClose}
@@ -404,7 +404,7 @@ const ContactAdminModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () =
           )}
         </div>
         
-        <div className="flex-shrink-0 mt-6 pt-4 border-t border-blue-300">
+        <div className="shrink-0 mt-6 pt-4 border-t border-blue-300">
           <div className="bg-blue-50 rounded-xl p-4 border border-blue-200 mb-4">
             <h4 className="font-semibold text-blue-800 mb-2">使用说明：</h4>
             <ul className="text-blue-700 space-y-1 text-sm">
@@ -502,14 +502,14 @@ const LegalModal = ({ isOpen, onClose, type }: { isOpen: boolean, onClose: () =>
 
   return (
     <div 
-      className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9999] overflow-y-auto py-8" 
+      className="fixed inset-0 bg-black/80 flex items-center justify-center z-9999 overflow-y-auto py-8" 
       onClick={onClose}
     >
       <div 
-        className="bg-gradient-to-br from-gray-900 to-gray-800 p-6 md:p-8 rounded-2xl border-2 border-gray-700 shadow-2xl max-w-3xl w-full mx-4 max-h-[90vh] flex flex-col" 
+        className="bg-linear-to-br from-gray-900 to-gray-800 p-6 md:p-8 rounded-2xl border-2 border-gray-700 shadow-2xl max-w-3xl w-full mx-4 max-h-[90vh] flex flex-col" 
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex-shrink-0 flex justify-between items-center mb-6 pb-4 border-b border-gray-700">
+        <div className="shrink-0 flex justify-between items-center mb-6 pb-4 border-b border-gray-700">
           <h3 className="text-2xl md:text-3xl font-bold text-white">{titles[type]}</h3>
           <button 
             onClick={onClose}
@@ -533,7 +533,7 @@ const LegalModal = ({ isOpen, onClose, type }: { isOpen: boolean, onClose: () =>
           </div>
         </div>
         
-        <div className="flex-shrink-0 mt-6">
+        <div className="shrink-0 mt-6">
           <button 
             onClick={onClose}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-300"
@@ -563,14 +563,14 @@ const AnnouncementModal = ({ isOpen, onClose, announcement }: { isOpen: boolean,
 
   return (
     <div 
-      className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9999] overflow-y-auto py-8" 
+      className="fixed inset-0 bg-black/80 flex items-center justify-center z-9999 overflow-y-auto py-8" 
       onClick={onClose}
     >
       <div 
-        className="bg-gradient-to-br from-gray-900 to-gray-800 p-6 md:p-8 rounded-2xl border-2 border-gray-700 shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] flex flex-col" 
+        className="bg-linear-to-br from-gray-900 to-gray-800 p-6 md:p-8 rounded-2xl border-2 border-gray-700 shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] flex flex-col" 
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex-shrink-0 flex justify-between items-center mb-6 pb-4 border-b border-gray-700">
+        <div className="shrink-0 flex justify-between items-center mb-6 pb-4 border-b border-gray-700">
           <h3 className="text-2xl font-bold text-white">{announcement.title}</h3>
           <button 
             onClick={onClose}
@@ -592,7 +592,7 @@ const AnnouncementModal = ({ isOpen, onClose, announcement }: { isOpen: boolean,
           </div>
         </div>
         
-        <div className="flex-shrink-0 mt-6">
+        <div className="shrink-0 mt-6">
           <button 
             onClick={onClose}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-300"
@@ -640,14 +640,14 @@ const EventModal = ({ isOpen, onClose, event }: { isOpen: boolean, onClose: () =
 
   return (
     <div 
-      className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9999] overflow-y-auto py-8" 
+      className="fixed inset-0 bg-black/80 flex items-center justify-center z-9999 overflow-y-auto py-8" 
       onClick={onClose}
     >
       <div 
-        className="bg-gradient-to-br from-gray-900 to-gray-800 p-6 md:p-8 rounded-2xl border-2 border-gray-700 shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] flex flex-col" 
+        className="bg-linear-to-br from-gray-900 to-gray-800 p-6 md:p-8 rounded-2xl border-2 border-gray-700 shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] flex flex-col" 
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex-shrink-0 flex justify-between items-center mb-6 pb-4 border-b border-gray-700">
+        <div className="shrink-0 flex justify-between items-center mb-6 pb-4 border-b border-gray-700">
           <h3 className="text-2xl font-bold text-white">{event.title}</h3>
           <button 
             onClick={onClose}
@@ -677,7 +677,7 @@ const EventModal = ({ isOpen, onClose, event }: { isOpen: boolean, onClose: () =
           )}
         </div>
         
-        <div className="flex-shrink-0 mt-6">
+        <div className="shrink-0 mt-6">
           <button 
             onClick={onClose}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-300"
@@ -745,13 +745,13 @@ export default function HomePage() {
         const eventsData = await eventsRes.json();
         const blacklistData = await blacklistRes.json();
         
-        if (announcementsData.success) {
+        if (announcementsData.success && Array.isArray(announcementsData.data)) {
           setAnnouncements(announcementsData.data.slice(0, 3));
         }
-        if (eventsData.success) {
+        if (eventsData.success && Array.isArray(eventsData.data)) {
           setEvents(eventsData.data.filter((e: any) => e.status !== 'ended').slice(0, 3));
         }
-        if (blacklistData.success) {
+        if (blacklistData.success && Array.isArray(blacklistData.data)) {
           setBlacklist(blacklistData.data.slice(0, 5));
         }
       } catch (error) {
@@ -1136,7 +1136,7 @@ export default function HomePage() {
         />
         
         {/* 渐变遮罩 */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/60 to-black/40"></div>
+        <div className="absolute inset-0 bg-linear-to-b from-black/80 via-black/60 to-black/40"></div>
       </div>
       
       {/* 滚动指示器 */}

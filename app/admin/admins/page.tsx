@@ -14,6 +14,7 @@ interface Admin {
   show_in_logs: boolean;
   receive_complaint_email: boolean;
   receive_application_email: boolean;
+  receive_qq_notifications: boolean;
   created_at: string;
 }
 
@@ -267,6 +268,7 @@ export default function AdminsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: editingAdmin.id,
+          username: formData.username,
           password: formData.password || undefined,
           display_name: formData.display_name,
           qq: formData.qq,
@@ -551,28 +553,28 @@ export default function AdminsPage() {
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    {!admin.is_owner && (
-                      <div className="flex gap-2 flex-wrap">
-                        <button
-                          onClick={() => openEditModal(admin)}
-                          className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-all text-sm"
-                        >
-                          编辑
-                        </button>
-                        <button
-                          onClick={() => openPermissionModal(admin)}
-                          className="px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-lg transition-all text-sm"
-                        >
-                          权限
-                        </button>
+                    <div className="flex gap-2 flex-wrap">
+                      <button
+                        onClick={() => openEditModal(admin)}
+                        className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-all text-sm"
+                      >
+                        编辑
+                      </button>
+                      <button
+                        onClick={() => openPermissionModal(admin)}
+                        className="px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-lg transition-all text-sm"
+                      >
+                        权限
+                      </button>
+                      {!admin.is_owner && (
                         <button
                           onClick={() => handleSingleDelete(admin.id, admin.username)}
                           className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg transition-all text-sm"
                         >
                           删除
                         </button>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -584,7 +586,7 @@ export default function AdminsPage() {
       {/* 添加/编辑管理员弹窗 */}
       {(showAddModal || editingAdmin) && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border-2 border-gray-700 rounded-2xl p-6 w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-linear-to-br from-gray-900 via-gray-800 to-gray-900 border-2 border-gray-700 rounded-2xl p-6 w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
                 <span>{editingAdmin ? '✏️' : '➕'}</span> {editingAdmin ? '编辑管理员' : '添加管理员'}
@@ -608,9 +610,8 @@ export default function AdminsPage() {
                   type="text"
                   value={formData.username}
                   onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                  disabled={!!editingAdmin}
                   placeholder="登录用户名"
-                  className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-500 disabled:opacity-50"
+                  className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-500"
                 />
               </div>
               
@@ -688,6 +689,14 @@ export default function AdminsPage() {
                   <label htmlFor="is_owner" className="text-gray-300">👑 设为服主（拥有所有权限）</label>
                 </div>
               )}
+              {editingAdmin && editingAdmin.is_owner && (
+                <div className="flex items-center gap-3 border-t border-gray-700 pt-4">
+                  <div className="w-5 h-5 rounded bg-gray-900 border-gray-700 flex items-center justify-center">
+                    <span className="text-sm text-white">✓</span>
+                  </div>
+                  <label className="text-gray-300">👑 服主（拥有所有权限）</label>
+                </div>
+              )}
 
               {/* 权限配置（仅在添加时显示，编辑在单独弹窗） */}
               {!editingAdmin && !formData.is_owner && (
@@ -743,13 +752,25 @@ export default function AdminsPage() {
       {/* 权限配置弹窗 */}
       {showPermissionModal && permissionAdmin && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border-2 border-gray-700 rounded-2xl p-6 w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-linear-to-br from-gray-900 via-gray-800 to-gray-900 border-2 border-gray-700 rounded-2xl p-6 w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
                 <span>🔐</span> 配置权限 - {permissionAdmin.display_name || permissionAdmin.username}
               </h2>
               <button
-                onClick={() => {
+                onClick={async () => {
+                  // 检查所有管理员权限
+                  const allAdmins = await fetch('/api/admin/list').then(res => res.json());
+                  if (allAdmins.success) {
+                    const adminsWithPermission = allAdmins.data.filter((admin: Admin) => 
+                      admin.permissions && admin.permissions.whitelist_review
+                    );
+                    
+                    if (adminsWithPermission.length === 0) {
+                      alert('警告：没有管理员拥有白名单审核权限！请至少为一个管理员开启此权限。');
+                    }
+                  }
+                  
                   setShowPermissionModal(false);
                   setPermissionAdmin(null);
                 }}
@@ -769,16 +790,25 @@ export default function AdminsPage() {
                     {category.permissions.map((key) => (
                       <div key={key} className="flex items-center justify-between bg-gray-700/50 rounded-lg p-3 hover:bg-gray-700/70 transition-colors">
                         <span className="text-gray-300">{permissionLabels[key]}</span>
-                        <button
-                          onClick={() => togglePermission(key)}
-                          className={`px-3 py-1.5 rounded-lg text-sm transition-all font-medium ${
-                            permissionAdmin.permissions[key]
-                              ? 'bg-green-600/20 text-green-400 border border-green-600/30 hover:bg-green-600/30'
-                              : 'bg-gray-600 text-gray-400 border border-gray-500 hover:bg-gray-500'
-                          }`}
-                        >
-                          {permissionAdmin.permissions[key] ? '✓ 允许' : '✗ 禁止'}
-                        </button>
+                        {permissionAdmin.is_owner ? (
+                          <button
+                            disabled
+                            className="px-3 py-1.5 rounded-lg text-sm transition-all font-medium bg-green-600/20 text-green-400 border border-green-600/30 cursor-not-allowed"
+                          >
+                            ✓ 允许
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => togglePermission(key)}
+                            className={`px-3 py-1.5 rounded-lg text-sm transition-all font-medium ${
+                              permissionAdmin.permissions[key]
+                                ? 'bg-green-600/20 text-green-400 border border-green-600/30 hover:bg-green-600/30'
+                                : 'bg-gray-600 text-gray-400 border border-gray-500 hover:bg-gray-500'
+                            }`}
+                          >
+                            {permissionAdmin.permissions[key] ? '✓ 允许' : '✗ 禁止'}
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -832,19 +862,13 @@ export default function AdminsPage() {
                     <div>
                       <span className="text-gray-300 block">接收QQ机器人通知</span>
                       <span className="text-gray-500 text-xs">当有新的白名单申请时发送QQ通知</span>
+                      <span className="text-yellow-400 text-xs mt-1 block">预计未来上线</span>
                     </div>
                     <button
-                      onClick={() => setPermissionAdmin({
-                        ...permissionAdmin,
-                        receive_qq_notifications: !permissionAdmin.receive_qq_notifications
-                      })}
-                      className={`px-3 py-1.5 rounded-lg text-sm transition-all font-medium ${
-                        permissionAdmin.receive_qq_notifications
-                          ? 'bg-green-600/20 text-green-400 border border-green-600/30 hover:bg-green-600/30'
-                          : 'bg-gray-600 text-gray-400 border border-gray-500 hover:bg-gray-500'
-                      }`}
+                      disabled
+                      className="px-3 py-1.5 rounded-lg text-sm transition-all font-medium bg-gray-600 text-gray-400 border border-gray-500 cursor-not-allowed"
                     >
-                      {permissionAdmin.receive_qq_notifications ? '✓ 开启' : '✗ 关闭'}
+                      未开放
                     </button>
                   </div>
                 </div>
@@ -853,7 +877,19 @@ export default function AdminsPage() {
             
             <div className="flex gap-3 mt-6">
               <button
-                onClick={() => {
+                onClick={async () => {
+                  // 检查所有管理员权限
+                  const allAdmins = await fetch('/api/admin/list').then(res => res.json());
+                  if (allAdmins.success) {
+                    const adminsWithPermission = allAdmins.data.filter((admin: Admin) => 
+                      admin.permissions && admin.permissions.whitelist_review
+                    );
+                    
+                    if (adminsWithPermission.length === 0) {
+                      alert('警告：没有管理员拥有白名单审核权限！请至少为一个管理员开启此权限。');
+                    }
+                  }
+                  
                   setShowPermissionModal(false);
                   setPermissionAdmin(null);
                 }}
@@ -862,7 +898,21 @@ export default function AdminsPage() {
                 取消
               </button>
               <button
-                onClick={handleUpdatePermissions}
+                onClick={async () => {
+                  await handleUpdatePermissions();
+                  
+                  // 检查所有管理员权限
+                  const allAdmins = await fetch('/api/admin/list').then(res => res.json());
+                  if (allAdmins.success) {
+                    const adminsWithPermission = allAdmins.data.filter((admin: Admin) => 
+                      admin.permissions && admin.permissions.whitelist_review
+                    );
+                    
+                    if (adminsWithPermission.length === 0) {
+                      alert('警告：没有管理员拥有白名单审核权限！请至少为一个管理员开启此权限。');
+                    }
+                  }
+                }}
                 disabled={saving}
                 className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all disabled:opacity-50"
               >
@@ -876,7 +926,7 @@ export default function AdminsPage() {
       {/* 批量权限修改弹窗 */}
       {showBatchPermissionModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border-2 border-gray-700 rounded-2xl p-6 w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-linear-to-br from-gray-900 via-gray-800 to-gray-900 border-2 border-gray-700 rounded-2xl p-6 w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
                 <span>🔐</span> 批量配置权限 ({selectedIds.size} 个管理员)

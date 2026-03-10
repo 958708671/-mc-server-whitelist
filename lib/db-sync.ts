@@ -295,6 +295,15 @@ export async function checkDbConnection(): Promise<boolean> {
 export async function startNetworkMonitor() {
   console.log('[网络监控] 启动网络状态检测');
   
+  // 启动定期从真实数据库同步到模拟数据库的任务
+  setInterval(async () => {
+    const isConnected = await checkDbConnection();
+    if (isConnected) {
+      console.log('[数据库同步] 定期从真实数据库同步到模拟数据库');
+      await syncFromRealToMock();
+    }
+  }, 60000); // 每60秒同步一次
+  
   setInterval(async () => {
     const isConnected = await checkDbConnection();
     

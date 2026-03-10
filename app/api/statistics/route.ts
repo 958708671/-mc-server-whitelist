@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
         SELECT 
           COUNT(*) FILTER (WHERE status = 'approved') as total_whitelist,
           COUNT(*) FILTER (WHERE status = 'pending') as pending_applications,
+          COUNT(*) FILTER (WHERE status = 'rejected') as rejected_applications,
           COUNT(*) FILTER (WHERE status = 'approved' AND reviewed_at >= NOW() - INTERVAL '7 days') as new_whitelist_week
         FROM whitelist_applications
       `;
@@ -21,12 +22,26 @@ export async function GET(request: NextRequest) {
         SELECT 
           COUNT(*) as total_complaints,
           COUNT(*) FILTER (WHERE status = 'pending') as pending_complaints,
-          COUNT(*) FILTER (WHERE status = 'resolved') as resolved_complaints
+          COUNT(*) FILTER (WHERE status = 'processing') as processing_complaints,
+          COUNT(*) FILTER (WHERE status = 'resolved') as resolved_complaints,
+          COUNT(*) FILTER (WHERE status = 'rejected') as rejected_complaints
         FROM complaints
       `;
       
       const [blacklistStats] = await sql`
-        SELECT COUNT(*) as total_blacklist FROM blacklist
+        SELECT 
+          COUNT(*) as total_blacklist,
+          COUNT(*) FILTER (WHERE is_permanent = true) as permanent_blacklist,
+          COUNT(*) FILTER (WHERE is_permanent = false) as temporary_blacklist
+        FROM blacklist
+      `;
+      
+      const [announcementStats] = await sql`
+        SELECT COUNT(*) as total_announcements FROM announcements
+      `;
+      
+      const [eventStats] = await sql`
+        SELECT COUNT(*) as total_events FROM events
       `;
       
       return NextResponse.json({
@@ -34,7 +49,9 @@ export async function GET(request: NextRequest) {
         data: {
           whitelist: whitelistStats,
           complaints: complaintStats,
-          blacklist: blacklistStats
+          blacklist: blacklistStats,
+          announcements: announcementStats,
+          events: eventStats
         }
       });
     }
