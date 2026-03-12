@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import OfflineStatusBar from '@/components/OfflineStatusBar';
+
 import DbErrorNotification from '@/components/DbErrorNotification';
 
 
@@ -146,7 +146,6 @@ export default function AdminLayout({
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [mockDbEnabled, setMockDbEnabled] = useState(false);
   const [showDbErrorNotification, setShowDbErrorNotification] = useState(false);
-  const [syncStatus, setSyncStatus] = useState<{ isConnected: boolean; lastSync: string } | null>(null);
   const pathname = usePathname();
 
   useEffect(() => {
@@ -174,34 +173,7 @@ export default function AdminLayout({
       });
   }, []);
 
-  useEffect(() => {
-    const checkConnection = async () => {
-      try {
-        const response = await fetch('/api/sync', { 
-          method: 'GET',
-          cache: 'no-store'
-        });
-        const data = await response.json();
-        setSyncStatus(data);
-        
-        if (!data.isConnected) {
-          setMockDbEnabled(true);
-          setShowDbErrorNotification(true);
-        }
-      } catch (error) {
-        setMockDbEnabled(true);
-        setShowDbErrorNotification(true);
-      }
-    };
 
-    // 初始检查
-    checkConnection();
-
-    // 每5秒检查一次连接状态
-    const interval = setInterval(checkConnection, 5000);
-
-    return () => clearInterval(interval);
-  }, []);
 
   const toggleMockDb = (e: React.ChangeEvent<HTMLInputElement>) => {
     setMockDbEnabled(e.target.checked);
@@ -270,8 +242,7 @@ export default function AdminLayout({
 
   return (
     <div className="h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex overflow-hidden">
-      {/* 离线状态提示 - 右上角固定 */}
-      <OfflineStatusBar />
+
       
       <aside
         className={`${
