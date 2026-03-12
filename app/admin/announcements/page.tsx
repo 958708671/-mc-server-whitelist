@@ -12,6 +12,7 @@ interface Announcement {
   created_by: string | null;
   created_at: string;
   expires_at: string | null;
+  sort_order: number;
 }
 
 export default function AnnouncementsPage() {
@@ -202,8 +203,6 @@ export default function AnnouncementsPage() {
     }
   };
 
-
-
   const handleEdit = (announcement: Announcement) => {
     setEditingId(announcement.id);
     setFormData({
@@ -229,13 +228,10 @@ export default function AnnouncementsPage() {
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleString('zh-CN', {
+    return new Date(dateStr).toLocaleDateString('zh-CN', {
       year: 'numeric',
       month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
+      day: '2-digit'
     });
   };
 
@@ -249,6 +245,68 @@ export default function AnnouncementsPage() {
         return <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs">更新</span>;
       default:
         return <span className="px-2 py-1 bg-gray-500/20 text-gray-400 rounded text-xs">普通</span>;
+    }
+  };
+
+  const handleMoveUp = async (id: number, currentOrder: number) => {
+    const sortedAnnouncements = [...announcements].sort((a, b) => a.sort_order - b.sort_order);
+    const currentIndex = sortedAnnouncements.findIndex(a => a.id === id);
+    
+    if (currentIndex > 0) {
+      const prevAnnouncement = sortedAnnouncements[currentIndex - 1];
+      
+      setProcessing(true);
+      try {
+        // 交换排序值
+        await Promise.all([
+          fetch('/api/announcements', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: id, sort_order: prevAnnouncement.sort_order })
+          }),
+          fetch('/api/announcements', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: prevAnnouncement.id, sort_order: currentOrder })
+          })
+        ]);
+        fetchAnnouncements();
+      } catch (error) {
+        alert('移动失败，请重试');
+      } finally {
+        setProcessing(false);
+      }
+    }
+  };
+
+  const handleMoveDown = async (id: number, currentOrder: number) => {
+    const sortedAnnouncements = [...announcements].sort((a, b) => a.sort_order - b.sort_order);
+    const currentIndex = sortedAnnouncements.findIndex(a => a.id === id);
+    
+    if (currentIndex < sortedAnnouncements.length - 1) {
+      const nextAnnouncement = sortedAnnouncements[currentIndex + 1];
+      
+      setProcessing(true);
+      try {
+        // 交换排序值
+        await Promise.all([
+          fetch('/api/announcements', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: id, sort_order: nextAnnouncement.sort_order })
+          }),
+          fetch('/api/announcements', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: nextAnnouncement.id, sort_order: currentOrder })
+          })
+        ]);
+        fetchAnnouncements();
+      } catch (error) {
+        alert('移动失败，请重试');
+      } finally {
+        setProcessing(false);
+      }
     }
   };
 
@@ -313,6 +371,7 @@ export default function AnnouncementsPage() {
                     className="w-4 h-4 rounded bg-gray-700 border-gray-600 text-cyan-500 focus:ring-cyan-500"
                   />
                 </th>
+                <th className="text-left px-4 py-3 text-gray-400 font-medium">排序</th>
                 <th className="text-left px-4 py-3 text-gray-400 font-medium">标题</th>
                 <th className="text-left px-4 py-3 text-gray-400 font-medium">类型</th>
                 <th className="text-left px-4 py-3 text-gray-400 font-medium">创建人</th>
@@ -330,6 +389,24 @@ export default function AnnouncementsPage() {
                       onChange={() => toggleSelect(announcement.id)}
                       className="w-4 h-4 rounded bg-gray-700 border-gray-600 text-cyan-500 focus:ring-cyan-500"
                     />
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-col items-center gap-1">
+                      <button
+                        onClick={() => handleMoveUp(announcement.id, announcement.sort_order)}
+                        disabled={processing}
+                        className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        onClick={() => handleMoveDown(announcement.id, announcement.sort_order)}
+                        disabled={processing}
+                        className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        ↓
+                      </button>
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">

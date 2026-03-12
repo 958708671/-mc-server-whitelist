@@ -6,14 +6,14 @@ const FeatureCard = ({ icon, title, description }: { icon: string; title: string
   const imageSrc = icon ? `/images/${icon}` : '';
   
   return (
-    <div className="bg-gray-900/50 p-6 rounded-xl border border-gray-700 backdrop-blur-sm hover:border-blue-500 transition-all duration-300 group">
-      <div className="flex items-center mb-4">
-        <div className="w-14 h-14 flex items-center justify-center mr-4 group-hover:scale-110 transition-transform duration-300">
+    <div className="bg-gray-900/50 p-4 sm:p-6 rounded-xl border border-gray-700 backdrop-blur-sm hover:border-blue-500 transition-all duration-300 group">
+      <div className="flex items-center mb-3">
+        <div className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center mr-3 sm:mr-4 group-hover:scale-110 transition-transform duration-300">
           {imageSrc ? (
             <img 
               src={imageSrc} 
               alt={title}
-              className="w-12 h-12 object-contain"
+              className="w-10 h-10 sm:w-12 sm:h-12 object-contain"
               onError={(e) => {
                 e.currentTarget.style.display = 'none';
                 const fallback = e.currentTarget.parentElement;
@@ -29,9 +29,9 @@ const FeatureCard = ({ icon, title, description }: { icon: string; title: string
             <span className="text-2xl">🔧</span>
           )}
         </div>
-        <h3 className="text-xl font-bold text-white">{title}</h3>
+        <h3 className="text-lg sm:text-xl font-bold text-white">{title}</h3>
       </div>
-      <p className="text-gray-300">{description}</p>
+      <p className="text-gray-300 text-sm sm:text-base">{description}</p>
     </div>
   );
 };
@@ -40,58 +40,12 @@ const FeatureCard = ({ icon, title, description }: { icon: string; title: string
 const SimpleImageCarousel = ({ currentImage = 0, onImageChange }: { currentImage?: number, onImageChange: (index: number) => void }) => {
   const autoPlayRef = useRef<NodeJS.Timeout | null>(null);
 
-  const images = [
-    {
-      id: 1,
-      src: "/images/1.png",
-      alt: "宣传图 1"
-    },
-    {
-      id: 2,
-      src: "/images/2.png",
-      alt: "宣传图 2"
-    },
-    {
-      id: 3,
-      src: "/images/3.png",
-      alt: "宣传图 3"
-    },
-    {
-      id: 4,
-      src: "/images/4.png",
-      alt: "宣传图 4"
-    },
-    {
-      id: 5,
-      src: "/images/5.png",
-      alt: "宣传图 5"
-    },
-    {
-      id: 6,
-      src: "/images/6.png",
-      alt: "宣传图 6"
-    },
-    {
-      id: 7,
-      src: "/images/7.png",
-      alt: "宣传图 7"
-    },
-    {
-      id: 8,
-      src: "/images/8.png",
-      alt: "宣传图 8"
-    },
-    {
-      id: 9,
-      src: "/images/9.png",
-      alt: "宣传图 9"
-    },
-    {
-      id: 10,
-      src: "/images/10.png",
-      alt: "宣传图 10"
-    }
-  ];
+  // 生成29张图片
+  const images = Array.from({ length: 29 }, (_, i) => ({
+    id: i + 1,
+    src: `/images/${i + 1}.webp`,
+    alt: `宣传图 ${i + 1}`
+  }));
 
   // 确保索引在有效范围内
   const validIndex = Math.max(0, Math.min(currentImage, images.length - 1));
@@ -697,10 +651,11 @@ export default function HomePage() {
   const [currentSection, setCurrentSection] = useState(0);
   const [isSponsorHovered, setIsSponsorHovered] = useState(false);
   const [currentImage, setCurrentImage] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   
   // 安全地设置当前图片索引
   const safeSetCurrentImage = (index: number) => {
-    const validIndex = Math.max(0, Math.min(index, 9));
+    const validIndex = Math.max(0, Math.min(index, 28));
     setCurrentImage(validIndex);
   };
   const [bgImagesLoaded, setBgImagesLoaded] = useState({
@@ -801,6 +756,15 @@ export default function HomePage() {
     maxPlayers: 20
   });
   
+  // 服务器版本
+  const [serverVersion, setServerVersion] = useState<{
+    version: string;
+    serverType: string;
+  }>({
+    version: '1.20.4',
+    serverType: 'Vanilla'
+  });
+  
   // 获取服务器状态
   useEffect(() => {
     const fetchServerStatus = async () => {
@@ -820,9 +784,33 @@ export default function HomePage() {
       }
     };
     
+    // 获取服务器版本
+    const fetchServerVersion = async () => {
+      try {
+        const response = await fetch('/api/server-version');
+        const result = await response.json();
+        if (result.success) {
+          setServerVersion({
+            version: result.data.version,
+            serverType: result.data.serverType
+          });
+        }
+      } catch (error) {
+        console.error('获取服务器版本失败:', error);
+        // 保持当前版本信息
+      }
+    };
+    
+    // 初始加载
     fetchServerStatus();
+    fetchServerVersion();
+    
     // 每30秒刷新一次
-    const interval = setInterval(fetchServerStatus, 30000);
+    const interval = setInterval(() => {
+      fetchServerStatus();
+      fetchServerVersion();
+    }, 30000);
+    
     return () => clearInterval(interval);
   }, []);
   
@@ -986,9 +974,9 @@ export default function HomePage() {
   useEffect(() => {
     const preloadImages = async () => {
       const imagePaths = [
-        '/images/主页背景图.png',
-        '/images/主页背景图2.png',
-        '/images/主页背景图3.png',
+        '/images/主页背景图.webp',
+        '/images/主页背景图2.webp',
+        '/images/主页背景图3.webp',
         '/images/草方块.png',
         '/images/红石.png',
         '/images/床.png',
@@ -1051,7 +1039,7 @@ export default function HomePage() {
           className="absolute inset-0 bg-center bg-no-repeat transition-opacity duration-1000" 
           style={{ 
             backgroundImage: bgImagesLoaded.bg1 
-              ? 'url(/images/主页背景图.png)' 
+              ? 'url(/images/主页背景图.webp)' 
               : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
@@ -1065,7 +1053,7 @@ export default function HomePage() {
           className="absolute inset-0 bg-center bg-no-repeat transition-opacity duration-1000" 
           style={{ 
             backgroundImage: bgImagesLoaded.bg2 
-              ? 'url(/images/主页背景图2.png)' 
+              ? 'url(/images/主页背景图2.webp)' 
               : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
@@ -1079,7 +1067,7 @@ export default function HomePage() {
           className="absolute inset-0 bg-center bg-no-repeat transition-opacity duration-1000" 
           style={{ 
             backgroundImage: bgImagesLoaded.bg3 
-              ? 'url(/images/主页背景图3.png)' 
+              ? 'url(/images/主页背景图3.webp)' 
               : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
@@ -1114,18 +1102,20 @@ export default function HomePage() {
       
       {/* 导航栏 */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-md border-b border-gray-800">
-        <div className="container mx-auto px-6 py-4">
+        <div className="container mx-auto px-4 py-3">
           <div className="flex justify-between items-center">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
               <div 
                 className="flex items-center space-x-2 cursor-pointer select-none"
                 onClick={handleLogoClick}
               >
-                <div className="text-xl font-bold text-blue-400">CT Cloud tops</div>
-                <div className="text-xl font-bold text-white">云顶之境</div>
+                <div className="text-sm md:text-xl font-bold text-blue-400">CT Cloud</div>
+                <div className="text-sm md:text-xl font-bold text-white">云顶之境</div>
               </div>
             </div>
-            <div className="flex items-center space-x-6">
+            
+            {/* 桌面端菜单 */}
+            <div className="hidden md:flex items-center space-x-4">
               <button 
                 onClick={() => scrollToSection(0)}
                 className={`text-gray-300 hover:text-white transition-colors duration-300 ${currentSection === 0 ? 'text-blue-400' : ''}`}
@@ -1136,27 +1126,22 @@ export default function HomePage() {
                 onClick={() => scrollToSection(1)}
                 className={`text-gray-300 hover:text-white transition-colors duration-300 ${currentSection === 1 ? 'text-blue-400' : ''}`}
               >
-                服务器介绍
+                社区动态
               </button>
               <button 
                 onClick={() => scrollToSection(2)}
                 className={`text-gray-300 hover:text-white transition-colors duration-300 ${currentSection === 2 ? 'text-blue-400' : ''}`}
               >
-                服务器风采
+                画廊
               </button>
-              <button 
-                onClick={() => scrollToSection(3)}
-                className={`text-gray-300 hover:text-white transition-colors duration-300 ${currentSection === 3 ? 'text-blue-400' : ''}`}
-              >
-                加入我们
-              </button>
+
               <button 
                 onClick={() => {
                   if (whitelistSectionRef.current) {
                     whitelistSectionRef.current.scrollIntoView({ behavior: 'smooth' });
                   }
                 }}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-5 rounded-lg transition duration-300"
+                className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-300 text-sm"
               >
                 申请白名单
               </button>
@@ -1164,26 +1149,53 @@ export default function HomePage() {
                 <>
                   <a 
                     href="/apply?skipQuiz=true"
-                    className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-5 rounded-lg transition duration-300"
+                    className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-300 text-sm"
                   >
-                    直接申请白名单
+                    直接申请
                   </a>
-                  <a 
-                    href="/admin"
-                    className="text-green-400 hover:text-green-300 text-sm transition-colors duration-300"
-                  >
-                    管理后台
-                  </a>
-                  <span className="text-gray-500 text-sm">|</span>
-                  <span className="text-gray-400 text-sm">{adminUser}</span>
-                  <button 
-                    onClick={handleAdminLogout}
-                    className="text-red-400 hover:text-red-300 text-sm transition-colors duration-300"
-                  >
-                    登出
-                  </button>
+                  <div className="relative group">
+                    <button className="flex items-center space-x-2 text-green-400 hover:text-green-300 text-sm transition-colors duration-300">
+                      <span>{adminUser}</span>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    <div className="absolute right-0 mt-2 w-48 bg-gray-900 border border-gray-700 rounded-lg shadow-lg py-2 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300">
+                      <div className="px-4 py-2 border-b border-gray-700">
+                        <div className="text-white text-sm font-medium">{adminUser}</div>
+                        <div className="text-gray-400 text-xs">{isOwner ? '服主' : '管理员'}</div>
+                      </div>
+                      <a 
+                        href="/admin/applications"
+                        className="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 transition-colors duration-300"
+                      >
+                        管理后台
+                      </a>
+                      <button 
+                        onClick={() => {
+                          localStorage.removeItem('adminInfo');
+                          setAdminLoggedIn(false);
+                          setAdminUser(null);
+                          setAdminId(null);
+                          setIsOwner(false);
+                        }}
+                        className="block w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-800 transition-colors duration-300"
+                      >
+                        退出登录
+                      </button>
+                    </div>
+                  </div>
                 </>
               ) : null}
+            </div>
+            
+            {/* 移动端菜单按钮 */}
+            <div className="md:hidden">
+              <button className="text-white">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
             </div>
           </div>
         </div>
@@ -1200,25 +1212,25 @@ export default function HomePage() {
           className="min-h-screen flex items-center justify-center px-6 py-24"
         >
           <div className="container mx-auto text-center">
-            <h1 className="text-5xl md:text-7xl font-bold mb-6">
+            <h1 className="text-3xl md:text-5xl lg:text-7xl font-bold mb-4">
               <span className="text-blue-400">{getElementContent('hero-title', 'Cloud tops 云顶之境')}</span>
             </h1>
-            <h2 className="text-2xl md:text-3xl font-semibold mb-8 text-white">{getElementContent('hero-subtitle', 'Minecraft 原版生存服务器')}</h2>
+            <h2 className="text-xl md:text-2xl lg:text-3xl font-semibold mb-6 text-white">{getElementContent('hero-subtitle', 'Minecraft 原版生存服务器')}</h2>
             
-            <p className="text-lg md:text-xl text-gray-300 max-w-3xl mx-auto mb-12 leading-relaxed">
+            <p className="text-base md:text-lg lg:text-xl text-gray-300 max-w-3xl mx-auto mb-8 leading-relaxed px-4">
               {getElementContent('hero-desc', '一个由玩家共建的纯原版 Minecraft 生存社区。服务器为公益性质，不向玩家收取任何费用，旨在打造一个纯净、友好、充满创造乐趣的游戏环境。')}
             </p>
             
-            <div className="inline-flex items-center justify-center space-x-6 bg-black/50 backdrop-blur-sm px-8 py-4 rounded-full mb-16 border border-gray-700">
-              <div className="flex items-center">
-                <div className={`w-3 h-3 rounded-full mr-2 ${getStatusConfig().color} ${getStatusConfig().animate ? 'animate-pulse' : ''}`}></div>
-                <span className="text-white">{getStatusConfig().text}</span>
+            <div className="inline-flex items-center justify-center flex-wrap space-x-4 bg-black/50 backdrop-blur-sm px-4 py-3 rounded-full mb-12 border border-gray-700 mx-4">
+              <div className="flex items-center mb-2 md:mb-0">
+                <div className={`w-2 h-2 rounded-full mr-2 ${getStatusConfig().color} ${getStatusConfig().animate ? 'animate-pulse' : ''}`}></div>
+                <span className="text-white text-sm">{getStatusConfig().text}</span>
               </div>
-              <span className="text-gray-400">|</span>
-              <span className="text-white">{serverStatus.onlinePlayers} / {serverStatus.maxPlayers} 人在线</span>
+              <span className="text-gray-400 hidden sm:inline">|</span>
+              <span className="text-white text-sm">{serverStatus.onlinePlayers} / {serverStatus.maxPlayers} 人在线</span>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-12 px-4">
               <FeatureCard 
                 icon={getElementIcon('card1-icon', '草方块.png')} 
                 title={getElementContent('card1-title', '原版生存')} 
@@ -1252,152 +1264,90 @@ export default function HomePage() {
           }}
           className="min-h-screen flex items-center justify-center px-6 py-24"
         >
-          <div className="container mx-auto">
-            <h2 className="text-4xl md:text-5xl font-bold text-center mb-12 text-white">服务器介绍</h2>
+          <div className="container mx-auto px-4">
+            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-center mb-8 text-white">社区动态</h2>
             
-            <div className="max-w-4xl mx-auto mb-12">
-              <p className="text-lg md:text-xl text-gray-300 text-center mb-12 leading-relaxed">
+            <div className="max-w-4xl mx-auto mb-8">
+              <p className="text-base md:text-lg lg:text-xl text-gray-300 text-center mb-8 leading-relaxed">
                 Cloud tops 云顶之境是一个专注于原版生存的Minecraft服务器，我们致力于为玩家提供一个纯净、稳定、友好的游戏环境。服务器采用白名单审核制度，确保每一位玩家都能在一个安全、和谐的环境中享受游戏。
               </p>
-              
-              <div className="grid md:grid-cols-2 gap-8">
-                <div className="bg-gray-900/70 p-8 rounded-xl border border-gray-700 backdrop-blur-sm">
-                  <h3 className="text-2xl font-bold mb-6 text-center text-white">服务器特色</h3>
-                  <ul className="space-y-4">
-                    <li className="flex items-start">
-                      <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 mr-3"></div>
-                      <span className="text-gray-300">100% 原版生存体验</span>
-                    </li>
-                    <li className="flex items-start">
-                      <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 mr-3"></div>
-                      <span className="text-gray-300">稳定的服务器性能</span>
-                    </li>
-                    <li className="flex items-start">
-                      <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 mr-3"></div>
-                      <span className="text-gray-300">友好的玩家社区</span>
-                    </li>
-                    <li className="flex items-start">
-                      <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 mr-3"></div>
-                      <span className="text-gray-300">定期的社区活动</span>
-                    </li>
-                    <li className="flex items-start">
-                      <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 mr-3"></div>
-                      <span className="text-gray-300">活跃的管理团队</span>
-                    </li>
-                    <li className="flex items-start">
-                      <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 mr-3"></div>
-                      <span className="text-gray-300">永久免费公益运营</span>
-                    </li>
-                  </ul>
-                </div>
-                
-                <div className="bg-gray-900/70 p-8 rounded-xl border border-gray-700 backdrop-blur-sm">
-                  <h3 className="text-2xl font-bold mb-6 text-center text-white">技术规格</h3>
-                  <ul className="space-y-4">
-                    <li className="flex items-start">
-                      <div className="w-2 h-2 bg-green-400 rounded-full mt-2 mr-3"></div>
-                      <span className="text-gray-300">服务器版本：Minecraft 1.20.4</span>
-                    </li>
-                    <li className="flex items-start">
-                      <div className="w-2 h-2 bg-green-400 rounded-full mt-2 mr-3"></div>
-                      <span className="text-gray-300">在线时间：24/7 不间断</span>
-                    </li>
-                    <li className="flex items-start">
-                      <div className="w-2 h-2 bg-green-400 rounded-full mt-2 mr-3"></div>
-                      <span className="text-gray-300">服务器位置：中国上海</span>
-                    </li>
-                    <li className="flex items-start">
-                      <div className="w-2 h-2 bg-green-400 rounded-full mt-2 mr-3"></div>
-                      <span className="text-gray-300">网络带宽：100Mbps</span>
-                    </li>
-                    <li className="flex items-start">
-                      <div className="w-2 h-2 bg-green-400 rounded-full mt-2 mr-3"></div>
-                      <span className="text-gray-300">防御能力：DDoS防护</span>
-                    </li>
-                    <li className="flex items-start">
-                      <div className="w-2 h-2 bg-green-400 rounded-full mt-2 mr-3"></div>
-                      <span className="text-gray-300">数据备份：每日自动备份</span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
             </div>
 
             {/* 最新公告和近期活动 */}
-            <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-6xl mx-auto">
               {/* 公告区域 */}
-              <div className="bg-gray-900/70 p-6 rounded-xl border border-gray-700">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-bold text-white flex items-center gap-2">
+              <div className="bg-gray-900/70 p-6 md:p-8 rounded-xl border border-gray-700 min-h-[400px] md:min-h-[500px]">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl md:text-2xl font-bold text-white flex items-center gap-2">
                     <span>📢</span> 最新公告
                   </h3>
-    
                 </div>
                 {announcements.length > 0 ? (
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     {announcements.map((announcement) => (
                       <div 
                         key={announcement.id}
-                        className="bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-blue-500 cursor-pointer transition-colors"
+                        className="bg-gray-800/50 p-2 md:p-3 rounded-lg border border-gray-700 hover:border-blue-500 cursor-pointer transition-colors"
                         onClick={() => {
                           setSelectedAnnouncement(announcement);
                           setShowAnnouncementModal(true);
                         }}
                       >
-                        <div className="flex items-center gap-2 mb-1">
-                          {announcement.is_important && (
-                            <span className="bg-red-500/20 text-red-400 px-2 py-0.5 rounded text-xs">重要</span>
-                          )}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            {announcement.is_important && (
+                              <span className="bg-red-500/20 text-red-400 px-2 py-0.5 rounded text-xs">重要</span>
+                            )}
+                            <h4 className="text-white font-medium text-sm md:text-base">{announcement.title}</h4>
+                          </div>
                           <span className="text-gray-500 text-xs">{new Date(announcement.created_at).toLocaleDateString('zh-CN')}</span>
                         </div>
-                        <h4 className="text-white font-medium truncate">{announcement.title}</h4>
-                        <p className="text-gray-400 text-sm mt-1 line-clamp-2">{announcement.content}</p>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-gray-500 text-center py-8">暂无公告</div>
+                  <div className="text-gray-500 text-center py-12">暂无公告</div>
                 )}
               </div>
               
               {/* 活动区域 */}
-              <div className="bg-gray-900/70 p-6 rounded-xl border border-gray-700">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-bold text-white flex items-center gap-2">
+              <div className="bg-gray-900/70 p-6 md:p-8 rounded-xl border border-gray-700 min-h-[400px] md:min-h-[500px]">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl md:text-2xl font-bold text-white flex items-center gap-2">
                     <span>🎉</span> 近期活动
                   </h3>
-
                 </div>
                 {events.length > 0 ? (
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     {events.map((event) => (
                       <div 
                         key={event.id}
-                        className="bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-green-500 cursor-pointer transition-colors"
+                        className="bg-gray-800/50 p-2 md:p-3 rounded-lg border border-gray-700 hover:border-green-500 cursor-pointer transition-colors"
                         onClick={() => {
                           setSelectedEvent(event);
                           setShowEventModal(true);
                         }}
                       >
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className={`px-2 py-0.5 rounded text-xs ${
-                            event.status === 'ongoing' ? 'bg-green-500/20 text-green-400' :
-                            event.status === 'upcoming' ? 'bg-yellow-500/20 text-yellow-400' :
-                            'bg-gray-500/20 text-gray-400'
-                          }`}>
-                            {event.status === 'ongoing' ? '进行中' : event.status === 'upcoming' ? '即将开始' : '已结束'}
-                          </span>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2 py-0.5 rounded text-xs ${
+                              event.status === 'ongoing' ? 'bg-green-500/20 text-green-400' :
+                              event.status === 'upcoming' ? 'bg-yellow-500/20 text-yellow-400' :
+                              'bg-gray-500/20 text-gray-400'
+                            }`}>
+                              {event.status === 'ongoing' ? '进行中' : event.status === 'upcoming' ? '即将开始' : '已结束'}
+                            </span>
+                            <h4 className="text-white font-medium text-sm md:text-base">{event.title}</h4>
+                          </div>
                           <span className="text-gray-500 text-xs">
                             {new Date(event.start_time).toLocaleDateString('zh-CN')}
                           </span>
                         </div>
-                        <h4 className="text-white font-medium truncate">{event.title}</h4>
-                        <p className="text-gray-400 text-sm mt-1 line-clamp-2">{event.description}</p>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-gray-500 text-center py-8">暂无活动</div>
+                  <div className="text-gray-500 text-center py-12">暂无活动</div>
                 )}
               </div>
             </div>
@@ -1411,18 +1361,18 @@ export default function HomePage() {
               sectionsRef.current[2] = el;
             }
           }}
-          className="min-h-screen flex items-center justify-center px-6 py-24"
+          className="min-h-screen flex items-center justify-center px-6 py-16"
         >
-          <div className="container mx-auto">
-            <h2 className="text-4xl md:text-5xl font-bold text-center mb-12 text-white">服务器风采</h2>
+          <div className="container mx-auto px-4">
+            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-center mb-8 text-white">画廊</h2>
             
             {/* 主要内容区域 */}
             <div className="bg-gray-900/70 rounded-xl border border-gray-700 overflow-hidden">
               {/* 顶部视频和轮播图 */}
               <div className="grid grid-cols-1 lg:grid-cols-2">
                 {/* 左侧视频 */}
-                <div className="p-6">
-                  <h3 className="text-2xl font-bold mb-4 text-white">宣传视频</h3>
+                <div className="p-4 md:p-6">
+                  <h3 className="text-xl md:text-2xl font-bold mb-3 text-white">宣传视频</h3>
                   <div className="w-full bg-gray-800/50 rounded-lg overflow-hidden">
                     <div className="aspect-video w-full">
                       <iframe 
@@ -1438,8 +1388,8 @@ export default function HomePage() {
                 </div>
                 
                 {/* 右侧轮播图 */}
-                <div className="p-6 border-l border-gray-700">
-                  <h3 className="text-2xl font-bold mb-4 text-white">宣传图</h3>
+                <div className="p-4 md:p-6 border-t border-gray-700 lg:border-t-0 lg:border-l border-gray-700">
+                  <h3 className="text-xl md:text-2xl font-bold mb-3 text-white">宣传图</h3>
                   <div className="w-full bg-gray-800/50 rounded-lg overflow-hidden">
                     <SimpleImageCarousel 
                       currentImage={currentImage} 
@@ -1450,21 +1400,41 @@ export default function HomePage() {
               </div>
               
               {/* 底部图片 */}
-              <div className="p-6 border-t border-gray-700">
+              <div className="p-4 md:p-6 border-t border-gray-700">
                 <div className="flex items-center justify-between mb-4">
-                  <button className="text-gray-400 hover:text-white text-2xl transition-colors duration-300">‹</button>
-                  <h4 className="text-lg font-semibold text-white">图片集</h4>
-                  <button className="text-gray-400 hover:text-white text-2xl transition-colors duration-300">›</button>
+                  <button 
+                    className={`text-gray-400 hover:text-white text-xl md:text-2xl transition-colors duration-300 ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    ‹
+                  </button>
+                  <h4 className="text-base md:text-lg font-semibold text-white">图片集</h4>
+                  <button 
+                    className={`text-gray-400 hover:text-white text-xl md:text-2xl transition-colors duration-300 ${currentPage === 3 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    onClick={() => setCurrentPage(prev => Math.min(3, prev + 1))}
+                    disabled={currentPage === 3}
+                  >
+                    ›
+                  </button>
                 </div>
-                <div className="grid grid-cols-5 gap-2">
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((item) => (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                  {(() => {
+                    const start = (currentPage - 1) * 10;
+                    const end = Math.min(start + 10, 29);
+                    const images = [];
+                    for (let i = start + 1; i <= end; i++) {
+                      images.push(i);
+                    }
+                    return images;
+                  })().map((item) => (
                     <div 
                       key={item} 
                       className="bg-gray-800/50 rounded-lg border border-gray-700 aspect-video overflow-hidden cursor-pointer transition-all duration-300 hover:border-blue-400 hover:scale-105"
                       onMouseEnter={() => safeSetCurrentImage(item - 1)}
                     >
                       <img 
-                        src={`/images/${item}.png`} 
+                        src={`/images/${item}.webp`} 
                         alt={`宣传图 ${item}`}
                         className="w-full h-full object-cover"
                       />
@@ -1484,65 +1454,65 @@ export default function HomePage() {
             }
             whitelistSectionRef.current = el;
           }}
-          className="min-h-screen flex items-center justify-center px-6 py-24"
+          className="min-h-screen flex items-center justify-center px-6 py-16"
         >
-          <div className="container mx-auto">
-            <h2 className="text-4xl md:text-5xl font-bold mb-12 text-white text-center">加入我们的社区</h2>
+          <div className="container mx-auto px-4">
+            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-8 text-white text-center">画廊</h2>
             
             <div className="max-w-6xl mx-auto">
               {/* 黑名单区域 */}
               {blacklist.length > 0 && (
-                <div className="bg-red-900/20 p-6 rounded-xl border border-red-700/50 mb-12">
+                <div className="bg-red-900/20 p-4 md:p-6 rounded-xl border border-red-700/50 mb-8">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-xl font-bold text-red-400 flex items-center gap-2">
+                    <h3 className="text-lg md:text-xl font-bold text-red-400 flex items-center gap-2">
                       <span>🚫</span> 黑名单公示
                     </h3>
                   </div>
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
                     {blacklist.map((player) => (
-                      <div key={player.id} className="bg-gray-900/50 p-3 rounded-lg border border-red-700/30 text-center">
-                        <div className="text-white font-medium truncate">{player.minecraft_id}</div>
+                      <div key={player.id} className="bg-gray-900/50 p-2 md:p-3 rounded-lg border border-red-700/30 text-center">
+                        <div className="text-white font-medium text-sm truncate">{player.minecraft_id}</div>
                         <div className="text-red-400/70 text-xs mt-1">{player.reason || '违规玩家'}</div>
                       </div>
                     ))}
                   </div>
-                  <p className="text-red-400/60 text-xs mt-4 text-center">以上玩家因违反服务器规则已被永久封禁</p>
+                  <p className="text-red-400/60 text-xs mt-3 text-center">以上玩家因违反服务器规则已被永久封禁</p>
                 </div>
               )}
               
               {/* 白名单申请 */}
-              <div className="bg-gray-900/70 p-8 rounded-xl border border-gray-700 mb-12">
-                <h3 className="text-2xl font-bold mb-6 text-white text-center">申请白名单</h3>
-                <p className="text-lg text-gray-300 mb-6 text-center">
+              <div className="bg-gray-900/70 p-4 md:p-6 rounded-xl border border-gray-700 mb-8">
+                <h3 className="text-xl md:text-2xl font-bold mb-4 text-white text-center">申请白名单</h3>
+                <p className="text-base md:text-lg text-gray-300 mb-4 md:mb-6 text-center">
                   为了维护纯净的游戏环境，我们采用白名单制度。申请通过后即可加入服务器，与数百位玩家一起创造属于你们的 Minecraft 世界。
                 </p>
                 
-                <div className="bg-gray-800/50 p-6 rounded-lg border border-gray-700 mb-6">
-                  <h4 className="text-lg font-semibold text-white mb-4 text-center">📋 申请流程</h4>
-                  <div className="flex flex-col md:flex-row items-center justify-center gap-4">
+                <div className="bg-gray-800/50 p-4 md:p-6 rounded-lg border border-gray-700 mb-6">
+                  <h4 className="text-base md:text-lg font-semibold text-white mb-4 text-center">📋 申请流程</h4>
+                  <div className="flex flex-wrap items-center justify-center gap-2 md:gap-4">
                     <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold">1</div>
-                      <span className="text-gray-300">选择题目类型</span>
+                      <div className="w-6 h-6 md:w-8 md:h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-xs md:text-sm">1</div>
+                      <span className="text-gray-300 text-sm md:text-base">选择题目类型</span>
                     </div>
                     <div className="text-gray-600 hidden md:block">→</div>
                     <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold">2</div>
-                      <span className="text-gray-300">答题测试</span>
+                      <div className="w-6 h-6 md:w-8 md:h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-xs md:text-sm">2</div>
+                      <span className="text-gray-300 text-sm md:text-base">答题测试</span>
                     </div>
                     <div className="text-gray-600 hidden md:block">→</div>
                     <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold">3</div>
-                      <span className="text-gray-300">填写申请表</span>
+                      <div className="w-6 h-6 md:w-8 md:h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-xs md:text-sm">3</div>
+                      <span className="text-gray-300 text-sm md:text-base">填写申请表</span>
                     </div>
                     <div className="text-gray-600 hidden md:block">→</div>
                     <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold">4</div>
-                      <span className="text-gray-300">等待审核</span>
+                      <div className="w-6 h-6 md:w-8 md:h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-xs md:text-sm">4</div>
+                      <span className="text-gray-300 text-sm md:text-base">等待审核</span>
                     </div>
                     <div className="text-gray-600 hidden md:block">→</div>
                     <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white font-bold">5</div>
-                      <span className="text-gray-300">邮件通知</span>
+                      <div className="w-6 h-6 md:w-8 md:h-8 bg-green-600 rounded-full flex items-center justify-center text-white font-bold text-xs md:text-sm">5</div>
+                      <span className="text-gray-300 text-sm md:text-base">邮件通知</span>
                     </div>
                   </div>
                 </div>
@@ -1550,7 +1520,7 @@ export default function HomePage() {
                 <div className="text-center">
                   <button 
                     onClick={() => setShowTermsModal(true)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-8 rounded-lg text-lg transition duration-300 inline-block"
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 md:py-3 px-6 md:px-8 rounded-lg text-sm md:text-lg transition duration-300 inline-block"
                   >
                     开始申请
                   </button>
@@ -1559,9 +1529,9 @@ export default function HomePage() {
                 {/* 服务协议和隐私协议弹窗 */}
                 {showTermsModal && (
                   <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
-                    <div className="bg-gray-800 border border-gray-700 rounded-2xl p-8 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-                      <div className="flex justify-between items-center mb-6">
-                        <h3 className="text-2xl font-bold text-white">服务协议与免责声明</h3>
+                    <div className="bg-gray-800 border border-gray-700 rounded-2xl p-4 md:p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+                      <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-xl md:text-2xl font-bold text-white">服务协议与免责声明</h3>
                         <button 
                           onClick={() => setShowTermsModal(false)}
                           className="text-gray-400 hover:text-white text-xl"
@@ -1570,10 +1540,10 @@ export default function HomePage() {
                         </button>
                       </div>
                       
-                      <div className="space-y-6">
+                      <div className="space-y-4">
                         <div>
-                          <h4 className="text-xl font-semibold text-blue-400 mb-3">服务协议与免责声明</h4>
-                          <div className="text-gray-300 space-y-2">
+                          <h4 className="text-lg md:text-xl font-semibold text-blue-400 mb-3">服务协议与免责声明</h4>
+                          <div className="text-gray-300 space-y-2 text-sm">
                             <p>1. 本服务器仅为Minecraft爱好者提供游戏交流平台，不涉及任何商业活动。</p>
                             <p>2. 您在服务器内的行为必须遵守相关法律法规和服务器规则，不得从事任何违法违规活动。</p>
                             <p>3. 服务器管理员有权根据规则对违规玩家进行处罚，包括但不限于警告、禁言、封禁等。</p>
@@ -1586,7 +1556,7 @@ export default function HomePage() {
                         </div>
                       </div>
                       
-                      <div className="mt-8 space-y-4">
+                      <div className="mt-6 space-y-4">
                         <div className="flex items-start space-x-2">
                           <input
                             type="checkbox"
@@ -1595,15 +1565,15 @@ export default function HomePage() {
                             onChange={(e) => setAgreeToTerms(e.target.checked)}
                             className="mt-1"
                           />
-                          <label htmlFor="agreeToTerms" className="text-gray-300">
+                          <label htmlFor="agreeToTerms" className="text-gray-300 text-sm">
                             我已阅读并同意上述服务协议与免责声明 <span className="text-red-500">*</span>
                           </label>
                         </div>
                         
-                        <div className="flex gap-4">
+                        <div className="flex gap-3">
                           <button
                             onClick={() => setShowTermsModal(false)}
-                            className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-3 px-6 rounded-lg transition duration-300"
+                            className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 md:py-3 px-4 md:px-6 rounded-lg transition duration-300"
                           >
                             取消
                           </button>
@@ -1615,7 +1585,7 @@ export default function HomePage() {
                               }
                             }}
                             disabled={!agreeToTerms}
-                            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-300 disabled:bg-gray-700 disabled:cursor-not-allowed"
+                            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 md:py-3 px-4 md:px-6 rounded-lg transition duration-300 disabled:bg-gray-700 disabled:cursor-not-allowed"
                           >
                             同意并继续
                           </button>
@@ -1626,12 +1596,12 @@ export default function HomePage() {
                 )}
               </div>
               
-              <div className="bg-gray-900/70 p-8 rounded-xl border border-gray-700">
-                <h3 className="text-2xl font-bold mb-6 text-white text-center">社区规则</h3>
-                <div className="grid md:grid-cols-2 gap-6 text-left">
+              <div className="bg-gray-900/70 p-4 md:p-6 rounded-xl border border-gray-700">
+                <h3 className="text-xl md:text-2xl font-bold mb-4 text-white text-center">社区规则</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
                   <div>
-                    <h4 className="text-lg font-semibold mb-3 text-blue-400">游戏规则</h4>
-                    <ul className="space-y-2 text-gray-300">
+                    <h4 className="text-base md:text-lg font-semibold mb-3 text-blue-400">游戏规则</h4>
+                    <ul className="space-y-2 text-gray-300 text-sm">
                       <li>• 禁止使用任何作弊客户端</li>
                       <li>• 禁止恶意破坏他人建筑</li>
                       <li>• 禁止盗取他人财物</li>
@@ -1639,8 +1609,8 @@ export default function HomePage() {
                     </ul>
                   </div>
                   <div>
-                    <h4 className="text-lg font-semibold mb-3 text-blue-400">社区规范</h4>
-                    <ul className="space-y-2 text-gray-300">
+                    <h4 className="text-base md:text-lg font-semibold mb-3 text-blue-400">社区规范</h4>
+                    <ul className="space-y-2 text-gray-300 text-sm">
                       <li>• 保持友好交流</li>
                       <li>• 互帮互助共同发展</li>
                       <li>• 遵守管理员安排</li>
@@ -1660,18 +1630,18 @@ export default function HomePage() {
               sectionsRef.current[4] = el;
             }
           }}
-          className="min-h-80 bg-black/90 border-t border-gray-800 flex items-center"
+          className="min-h-60 bg-black/90 border-t border-gray-800 flex items-center"
         >
-          <div className="container mx-auto px-6 py-12">
-            <div className="grid md:grid-cols-4 gap-8 mb-8">
+          <div className="container mx-auto px-4 py-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6">
               <div>
-                <h3 className="text-xl font-bold text-white mb-4">Cloud tops 云顶之境</h3>
-                <p className="text-gray-400 mb-4 text-sm">一个由玩家共建的纯原版 Minecraft 生存社区，致力于打造纯净、友好的游戏环境。</p>
+                <h3 className="text-lg md:text-xl font-bold text-white mb-3">Cloud tops 云顶之境</h3>
+                <p className="text-gray-400 mb-3 text-sm">一个由玩家共建的纯原版 Minecraft 生存社区，致力于打造纯净、友好的游戏环境。</p>
                 <p className="text-gray-500 text-xs">© 2026 Cloud tops 云顶之境服务器</p>
               </div>
               <div>
-                <h4 className="text-lg font-bold text-white mb-4">快速导航</h4>
-                <ul className="space-y-2 text-gray-400">
+                <h4 className="text-base md:text-lg font-bold text-white mb-3">快速导航</h4>
+                <ul className="space-y-2 text-gray-400 text-sm">
                   <li>
                     <span 
                       onClick={() => scrollToSection(0)}
@@ -1707,8 +1677,8 @@ export default function HomePage() {
                 </ul>
               </div>
               <div>
-                <h4 className="text-lg font-bold text-white mb-4">常见问题</h4>
-                <ul className="space-y-2 text-gray-400">
+                <h4 className="text-base md:text-lg font-bold text-white mb-3">常见问题</h4>
+                <ul className="space-y-2 text-gray-400 text-sm">
                   <li><span className="hover:text-blue-400 cursor-pointer transition-colors duration-300 block">如何申请白名单？</span></li>
                   <li><span className="hover:text-blue-400 cursor-pointer transition-colors duration-300 block">服务器有哪些规则？</span></li>
                   <li><span className="hover:text-blue-400 cursor-pointer transition-colors duration-300 block">如何加入QQ群？</span></li>
@@ -1716,8 +1686,8 @@ export default function HomePage() {
                 </ul>
               </div>
               <div>
-                <h4 className="text-lg font-bold text-white mb-4">法律声明</h4>
-                <ul className="space-y-2 text-gray-400">
+                <h4 className="text-base md:text-lg font-bold text-white mb-3">法律声明</h4>
+                <ul className="space-y-2 text-gray-400 text-sm">
                   <li>
                     <button 
                       onClick={() => {
@@ -1765,7 +1735,7 @@ export default function HomePage() {
                 </ul>
               </div>
             </div>
-            <div className="border-t border-gray-800 pt-8 text-center text-gray-500 text-sm">
+            <div className="border-t border-gray-800 pt-6 text-center text-gray-500 text-xs">
               <p>本服务器为玩家社群自发组建与维护，与 Mojang AB 无任何关联。</p>
               <p className="mt-2">遇到问题？请联系管理员 QQ: 123456789 或发送邮件至 admin@cloudtops.com</p>
             </div>
@@ -1774,20 +1744,20 @@ export default function HomePage() {
       </main>
 
       {/* 右下角固定按钮 */}
-      <div className="fixed bottom-6 right-6 flex flex-col space-y-3 z-50">
+      <div className="fixed bottom-4 right-4 flex flex-col space-y-2 z-50">
         <div className="relative"
           onMouseEnter={() => setIsSponsorHovered(true)}
           onMouseLeave={() => setIsSponsorHovered(false)}
         >
           <button 
             onClick={() => setShowSponsorModal(true)}
-            className="bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg shadow-lg transition duration-300 flex items-center justify-center space-x-2 min-w-[140px]"
+            className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg shadow-lg transition duration-300 flex items-center justify-center space-x-1 min-w-[120px] text-sm"
             title="自愿赞助"
           >
             <img 
               src="/images/钻石.png" 
               alt="钻石" 
-              className="w-8 h-8" 
+              className="w-6 h-6" 
               loading="lazy"
               onError={(e) => {
                 e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23ffffff' d='M19 12l-7 10-7-10 7-10z'/%3E%3C/svg%3E";
@@ -1797,26 +1767,26 @@ export default function HomePage() {
           </button>
           
           {isSponsorHovered && (
-            <div className="absolute bottom-full right-0 mb-2 bg-gray-800 border border-gray-700 rounded-lg shadow-lg px-4 py-2 whitespace-nowrap">
-              <p className="text-white text-sm">点击查看赞助二维码</p>
+            <div className="absolute bottom-full right-0 mb-2 bg-gray-800 border border-gray-700 rounded-lg shadow-lg px-3 py-1 whitespace-nowrap">
+              <p className="text-white text-xs">点击查看赞助二维码</p>
             </div>
           )}
         </div>
 
         <button 
           onClick={() => setShowContactModal(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg shadow-lg transition duration-300 flex items-center justify-center space-x-2 min-w-[140px]"
+          className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg shadow-lg transition duration-300 flex items-center justify-center space-x-1 min-w-[120px] text-sm"
           title="联系管理"
         >
-          <span className="text-lg">📞</span>
+          <span className="text-base">📞</span>
           <span>联系管理</span>
         </button>
         <a 
           href="/complaint"
-          className="bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-lg shadow-lg transition duration-300 flex items-center justify-center space-x-2 min-w-[140px]"
+          className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg shadow-lg transition duration-300 flex items-center justify-center space-x-1 min-w-[120px] text-sm"
           title="投诉举报"
         >
-          <span className="text-lg">🚫</span>
+          <span className="text-base">🚫</span>
           <span>投诉举报</span>
         </a>
       </div>

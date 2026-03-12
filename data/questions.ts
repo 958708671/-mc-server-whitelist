@@ -126,6 +126,11 @@ export const questionCategories: QuestionCategory[] = [
       { id: 98, question: '海绵可以用来制作水下建筑。', options: ['正确', '错误'], correct: 0, type: 'judgment', note: '水下建筑材料' },
       { id: 99, question: '地毯可以阻止怪物生成。', options: ['正确', '错误'], correct: 0, type: 'judgment', note: '怪物生成条件' },
       { id: 100, question: '深板岩需要石镐及以上工具采集。', options: ['正确', '错误'], correct: 0, type: 'judgment', note: '深板岩采集工具' },
+      { id: 101, question: '以下哪种方块可以用来制作楼梯？', options: ['石头', '木板', '砖块', '以上都可以'], correct: 3, type: 'single', note: '楼梯制作材料' },
+      { id: 102, question: '以下哪种方块可以用来制作台阶？', options: ['石头', '木板', '砖块', '以上都可以'], correct: 3, type: 'single', note: '台阶制作材料' },
+      { id: 103, question: '以下哪些方块可以用来建造墙壁？', options: ['石头', '砖块', '木板', '以上都可以'], correct: [0, 1, 2, 3], type: 'multiple', note: '墙壁建造材料' },
+      { id: 104, question: '以下哪些方块可以用来建造天花板？', options: ['石头', '木板', '砖块', '以上都可以'], correct: [0, 1, 2, 3], type: 'multiple', note: '天花板建造材料' },
+      { id: 105, question: '楼梯可以用来建造斜坡。', options: ['正确', '错误'], correct: 0, type: 'judgment', note: '楼梯斜坡功能' },
     ]
   },
   {
@@ -237,6 +242,11 @@ export const questionCategories: QuestionCategory[] = [
       { id: 98, question: '红石矿可以用铁镐挖掘。', options: ['正确', '错误'], correct: 0, type: 'judgment', note: '红石矿挖掘工具' },
       { id: 99, question: '下界石英矿可以用木镐挖掘。', options: ['正确', '错误'], correct: 1, type: 'judgment', note: '下界石英矿挖掘工具' },
       { id: 100, question: '煤矿可以用木镐挖掘。', options: ['正确', '错误'], correct: 0, type: 'judgment', note: '煤矿挖掘工具' },
+      { id: 101, question: '以下哪种生物会掉落皮革？', options: ['牛', '猪', '羊', '鸡'], correct: 0, type: 'single', note: '皮革掉落' },
+      { id: 102, question: '以下哪种生物会掉落羊毛？', options: ['羊', '牛', '猪', '鸡'], correct: 0, type: 'single', note: '羊毛掉落' },
+      { id: 103, question: '以下哪些生物会掉落食物？', options: ['猪-猪肉', '牛-牛肉', '羊-羊肉', '鸡-鸡肉'], correct: [0, 1, 2, 3], type: 'multiple', note: '食物掉落生物' },
+      { id: 104, question: '以下哪些生物会掉落材料？', options: ['蜘蛛-线', '骷髅-骨头', '末影人-末影珍珠', '烈焰人-烈焰棒'], correct: [0, 1, 2, 3], type: 'multiple', note: '材料掉落生物' },
+      { id: 105, question: '以下哪些生物可以在夜间生成？', options: ['僵尸', '骷髅', '苦力怕', '末影人'], correct: [0, 1, 2, 3], type: 'multiple', note: '夜间生成生物' },
     ]
   },
   {
@@ -348,6 +358,11 @@ export const questionCategories: QuestionCategory[] = [
       { id: 98, question: '蘑菇可以在任何光照条件下生长。', options: ['正确', '错误'], correct: 1, type: 'judgment', note: '蘑菇生长条件' },
       { id: 99, question: '地狱疣只能在下界生长。', options: ['正确', '错误'], correct: 0, type: 'judgment', note: '地狱疣生长条件' },
       { id: 100, question: '仙人掌只能在沙漠生长。', options: ['正确', '错误'], correct: 0, type: 'judgment', note: '仙人掌生长条件' },
+      { id: 101, question: '以下哪种作物需要水才能生长？', options: ['小麦', '胡萝卜', '马铃薯', '以上都需要'], correct: 3, type: 'single', note: '作物需水生长' },
+      { id: 102, question: '以下哪种作物需要光照才能生长？', options: ['小麦', '胡萝卜', '马铃薯', '以上都需要'], correct: 3, type: 'single', note: '作物需光生长' },
+      { id: 103, question: '以下哪些作物可以用骨粉催熟？', options: ['小麦', '胡萝卜', '马铃薯', '以上都可以'], correct: [0, 1, 2, 3], type: 'multiple', note: '骨粉催熟作物' },
+      { id: 104, question: '以下哪些动物可以繁殖？', options: ['猪', '牛', '羊', '以上都可以'], correct: [0, 1, 2, 3], type: 'multiple', note: '可繁殖动物' },
+      { id: 105, question: '蜜蜂可以收集蜂蜜。', options: ['正确', '错误'], correct: 0, type: 'judgment', note: '蜜蜂蜂蜜收集' },
     ]
   },
   {
@@ -459,6 +474,11 @@ export const questionCategories: QuestionCategory[] = [
       { id: 98, question: '红石灯需要15的信号强度才能点亮。', options: ['正确', '错误'], correct: 1, type: 'judgment', note: '红石灯点亮条件' },
       { id: 99, question: '阳光传感器在夜间会输出0信号。', options: ['正确', '错误'], correct: 0, type: 'judgment', note: '阳光传感器夜间信号' },
       { id: 100, question: '压力板可以检测玩家和生物。', options: ['正确', '错误'], correct: 0, type: 'judgment', note: '压力板检测功能' },
+      { id: 101, question: '以下哪种红石物品可以存储信号？', options: ['红石中继器', '红石比较器', '红石块', '以上都可以'], correct: 3, type: 'single', note: '红石信号存储' },
+      { id: 102, question: '以下哪种红石物品可以延迟信号？', options: ['红石中继器', '红石比较器', '红石火把', '红石灯'], correct: 0, type: 'single', note: '红石信号延迟' },
+      { id: 103, question: '以下哪些红石物品可以传输信号？', options: ['红石粉', '红石块', '红石火把', '以上都可以'], correct: [0, 1, 2, 3], type: 'multiple', note: '红石信号传输物品' },
+      { id: 104, question: '以下哪些红石物品可以检测信号？', options: ['红石比较器', '红石中继器', '观察者', '以上都可以'], correct: [0, 1, 2, 3], type: 'multiple', note: '红石信号检测物品' },
+      { id: 105, question: '红石电路需要规划。', options: ['正确', '错误'], correct: 0, type: 'judgment', note: '红石电路规划' },
     ]
   },
   {
@@ -570,6 +590,11 @@ export const questionCategories: QuestionCategory[] = [
       { id: 98, question: '/tell指令可以发送消息。', options: ['正确', '错误'], correct: 0, type: 'judgment', note: '发送消息指令功能' },
       { id: 99, question: '/op指令可以设置管理员。', options: ['正确', '错误'], correct: 0, type: 'judgment', note: '管理员指令功能' },
       { id: 100, question: '/ban指令可以封禁玩家。', options: ['正确', '错误'], correct: 0, type: 'judgment', note: '封禁指令功能' },
+      { id: 101, question: '以下哪个指令可以查看玩家信息？', options: ['/list', '/who', '/players', '/info'], correct: 0, type: 'single', note: '查看玩家指令' },
+      { id: 102, question: '以下哪个指令可以踢出玩家？', options: ['/kick', '/remove', '/ban', '/exit'], correct: 0, type: 'single', note: '踢出玩家指令' },
+      { id: 103, question: '以下哪些指令可以管理玩家？', options: ['/op', '/ban', '/kick', '/whitelist'], correct: [0, 1, 2, 3], type: 'multiple', note: '玩家管理指令' },
+      { id: 104, question: '以下哪些指令可以管理世界？', options: ['/time', '/weather', '/gamemode', '/difficulty'], correct: [0, 1, 2, 3], type: 'multiple', note: '世界管理指令' },
+      { id: 105, question: '指令需要权限。', options: ['正确', '错误'], correct: 0, type: 'judgment', note: '指令权限' },
     ]
   },
   // 新增题库：PVP战斗

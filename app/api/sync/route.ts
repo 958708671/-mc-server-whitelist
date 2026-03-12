@@ -1,43 +1,72 @@
-// API路由 - 数据库同步
 import { NextRequest, NextResponse } from 'next/server';
-import { syncFromRealToMock, syncFromMockToReal, getSyncState, checkDbConnection } from '@/lib/db-sync';
+import {
+  syncDownFromRealDb,
+  syncUpToRealDb,
+  performAutoSync,
+  getSyncStatus,
+  checkRealDbConnection
+} from '@/lib/db-sync';
 
-export async function GET(request: NextRequest) {
+// 获取同步状态
+export async function GET() {
   try {
-    const action = request.nextUrl.searchParams.get('action');
+    const isConnected = await checkRealDbConnection();
+    const status = getSyncStatus();
     
-    switch (action) {
-      case 'status':
-        const state = getSyncState();
-        const isConnected = await checkDbConnection();
-        return NextResponse.json({
-          success: true,
-          data: {
-            ...state,
-            isConnected,
-            pendingSyncCount: 0
-          }
-        });
-        
-      case 'sync-real-to-mock':
-        const syncRealResult = await syncFromRealToMock();
-        return NextResponse.json(syncRealResult);
-        
-      case 'sync-mock-to-real':
-        const syncMockResult = await syncFromMockToReal();
-        return NextResponse.json(syncMockResult);
-        
-      default:
-        return NextResponse.json({
-          success: false,
-          message: '无效的操作'
-        }, { status: 400 });
-    }
-  } catch (error) {
-    console.error('同步API错误:', error);
+    return NextResponse.json({
+      success: true,
+      isConnected,
+      ...status
+    });
+  } catch (error: any) {
     return NextResponse.json({
       success: false,
-      message: '服务器错误'
+      error: error.message
+    }, { status: 500 });
+  }
+}
+
+// 执行同步
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { direction = 'auto' } = body;
+    
+    const isConnected = await checkRealDbConnection();
+    
+    if (!isConnected) {
+      return NextResponse.json({
+        success: false,
+        message: '真实数据库连接失败，无法同步',
+        isConnected: false
+      }, { status: 503 });
+    }
+    
+    let result;
+    
+    switch (direction) {
+      case 'down':
+        result = await syncDownFromRealDb();
+        break;
+      case 'up':
+        result = await syncUpToRealDb();
+        break;
+      case 'auto':
+      default:
+        result = await performAutoSync();
+        break;
+    }
+    
+    return NextResponse.json({
+      ...result,
+      isConnected: true
+    });
+  } catch (error: any) {
+    return NextResponse.json({
+      success: false,
+      message: '同步失败',
+      error: error.message,
+      isConnected: false
     }, { status: 500 });
   }
 }

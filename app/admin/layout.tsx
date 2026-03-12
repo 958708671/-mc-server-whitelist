@@ -2,40 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import OfflineStatusBar from '@/components/OfflineStatusBar';
+import DbErrorNotification from '@/components/DbErrorNotification';
 
-function DbErrorNotification({ onClose }: { onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-      <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border-2 border-orange-500/50 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-pulse">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center text-2xl">
-            ⚠️
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-white">数据库连接失败</h2>
-            <p className="text-orange-400 text-sm">请检查数据库连接配置</p>
-          </div>
-        </div>
-        
-        <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-4 mb-4">
-          <p className="text-gray-300 text-sm leading-relaxed">
-            系统检测到无法连接到数据库，请检查数据库连接配置和服务状态。
-          </p>
-          <p className="text-gray-400 text-xs mt-2">
-            请确保数据库服务正在运行，且连接参数配置正确。
-          </p>
-        </div>
-        
-        <button
-          onClick={onClose}
-          className="w-full px-4 py-3 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white rounded-xl transition-all font-medium"
-        >
-          我知道了
-        </button>
-      </div>
-    </div>
-  );
-}
+
 
 function PasswordModal({ adminId, onClose }: { adminId: number; onClose: () => void }) {
   const [oldPassword, setOldPassword] = useState('');
@@ -105,7 +75,8 @@ function PasswordModal({ adminId, onClose }: { adminId: number; onClose: () => v
               type="password"
               value={oldPassword}
               onChange={(e) => setOldPassword(e.target.value)}
-              className="w-full bg-gray-800/50 border-2 border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-cyan-500 transition-all"
+              className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white focus:outline-none focus:border-amber-500 transition-colors"
+              placeholder="请输入原密码"
             />
           </div>
           
@@ -115,7 +86,8 @@ function PasswordModal({ adminId, onClose }: { adminId: number; onClose: () => v
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full bg-gray-800/50 border-2 border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-cyan-500 transition-all"
+              className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white focus:outline-none focus:border-amber-500 transition-colors"
+              placeholder="请输入新密码"
             />
           </div>
           
@@ -125,33 +97,29 @@ function PasswordModal({ adminId, onClose }: { adminId: number; onClose: () => v
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full bg-gray-800/50 border-2 border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-cyan-500 transition-all"
+              className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white focus:outline-none focus:border-amber-500 transition-colors"
+              placeholder="请再次输入新密码"
             />
           </div>
+          
+          {message && (
+            <div className={`text-sm ${message.includes('成功') ? 'text-green-400' : 'text-red-400'}`}>
+              {message}
+            </div>
+          )}
         </div>
         
-        {message && (
-          <div className={`mt-4 p-3 rounded-xl text-sm flex items-center gap-2 ${
-            message.includes('成功') 
-              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
-              : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-          }`}>
-            <span>{message.includes('成功') ? '✅' : '❌'}</span>
-            {message}
-          </div>
-        )}
-        
-        <div className="flex space-x-3 mt-6">
+        <div className="flex gap-3 mt-6">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-xl transition-all"
+            className="flex-1 px-4 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-xl transition-colors font-medium"
           >
             取消
           </button>
           <button
             onClick={handleSubmit}
             disabled={loading}
-            className="flex-1 px-4 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+            className="flex-1 px-4 py-3 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white rounded-xl transition-colors font-medium disabled:opacity-50"
           >
             {loading ? '修改中...' : '确认修改'}
           </button>
@@ -161,42 +129,43 @@ function PasswordModal({ adminId, onClose }: { adminId: number; onClose: () => v
   );
 }
 
+interface AdminInfo {
+  user: string;
+  adminId: number;
+  qq: string;
+  isOwner: boolean;
+}
+
 export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
-  const [adminInfo, setAdminInfo] = useState<{
-    user: string;
-    adminId: number;
-    isOwner: boolean;
-    qq?: string;
-  } | null>(null);
+  const [adminInfo, setAdminInfo] = useState<AdminInfo | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [mockDbEnabled, setMockDbEnabled] = useState(false);
   const [showDbErrorNotification, setShowDbErrorNotification] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<{ isConnected: boolean; lastSync: string } | null>(null);
+  const pathname = usePathname();
 
   useEffect(() => {
     const savedAdmin = localStorage.getItem('adminInfo');
-    if (!savedAdmin) {
+    if (savedAdmin) {
+      try {
+        const info = JSON.parse(savedAdmin);
+        setAdminInfo(info);
+      } catch (e) {
+        window.location.href = '/';
+      }
+    } else {
       window.location.href = '/';
-      return;
     }
-    try {
-      const info = JSON.parse(savedAdmin);
-      setAdminInfo(info);
-    } catch (e) {
-      window.location.href = '/';
-    }
-  }, []);
 
-  // 检查数据库连接状态
-  useEffect(() => {
-    fetch('/api/db-status')
-      .then(res => res.json())
-      .then(data => {
-        if (!data.success) {
+    // 检查数据库连接
+    fetch('/api/admin/list')
+      .then(response => {
+        if (!response.ok) {
           setShowDbErrorNotification(true);
         }
       })
@@ -204,6 +173,39 @@ export default function AdminLayout({
         setShowDbErrorNotification(true);
       });
   }, []);
+
+  useEffect(() => {
+    const checkConnection = async () => {
+      try {
+        const response = await fetch('/api/sync', { 
+          method: 'GET',
+          cache: 'no-store'
+        });
+        const data = await response.json();
+        setSyncStatus(data);
+        
+        if (!data.isConnected) {
+          setMockDbEnabled(true);
+          setShowDbErrorNotification(true);
+        }
+      } catch (error) {
+        setMockDbEnabled(true);
+        setShowDbErrorNotification(true);
+      }
+    };
+
+    // 初始检查
+    checkConnection();
+
+    // 每5秒检查一次连接状态
+    const interval = setInterval(checkConnection, 5000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const toggleMockDb = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setMockDbEnabled(e.target.checked);
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('adminInfo');
@@ -268,6 +270,9 @@ export default function AdminLayout({
 
   return (
     <div className="h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex overflow-hidden">
+      {/* 离线状态提示 - 右上角固定 */}
+      <OfflineStatusBar />
+      
       <aside
         className={`${
           sidebarCollapsed ? 'w-20' : 'w-72'
@@ -307,33 +312,28 @@ export default function AdminLayout({
                     )}
                   </div>
                   <div>
-                    <p className="text-sm text-gray-300">{adminInfo.user}</p>
-                    {adminInfo.qq && (
-                      <p className="text-xs text-gray-400">QQ: {adminInfo.qq}</p>
-                    )}
-                    {adminInfo.isOwner && (
-                      <span className="inline-block px-2 py-0.5 bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-400 text-xs rounded border border-amber-500/30">
-                        👑 服主
-                      </span>
-                    )}
+                    <p className="text-white text-sm font-medium">{adminInfo.user}</p>
+                    <p className="text-gray-400 text-xs">{adminInfo.isOwner ? '服主' : '管理员'}</p>
                   </div>
                 </div>
               </div>
             )}
             <button
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-gray-800 transition-all"
+              className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white"
             >
-              {sidebarCollapsed ? '→' : '←'}
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={sidebarCollapsed ? "M9 5l7 7-7 7" : "M15 19l-7-7 7-7"} />
+              </svg>
             </button>
           </div>
         </div>
 
-        <nav className="flex-1 p-2 overflow-y-auto overflow-x-hidden" style={{ scrollBehavior: 'smooth' }}>
+        <nav className="flex-1 overflow-y-auto p-3 space-y-4">
           {menuCategories.map((category, idx) => (
-            <div key={idx} className="mb-4">
+            <div key={idx}>
               {!sidebarCollapsed && (
-                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider px-3 mb-2">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 px-3">
                   {category.category}
                 </h3>
               )}
@@ -344,7 +344,7 @@ export default function AdminLayout({
                     href={item.path}
                     className={`flex items-center space-x-3 px-3 py-2.5 rounded-xl transition-all ${
                       pathname === item.path
-                        ? 'bg-gradient-to-r from-cyan-600/20 to-blue-600/20 text-cyan-400 border border-cyan-500/30'
+                        ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white'
                         : 'text-gray-300 hover:bg-gray-800 hover:text-white'
                     }`}
                   >
@@ -363,6 +363,16 @@ export default function AdminLayout({
         </nav>
 
         <div className="p-3 border-t-2 border-gray-700 space-y-2 flex-shrink-0">
+          <div className="w-full px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-white rounded-xl transition-all text-sm flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <span>🗃️</span>
+              {!sidebarCollapsed && <span>模拟数据库</span>}
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" className="sr-only peer" checked={mockDbEnabled} onChange={toggleMockDb} />
+              <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+            </label>
+          </div>
           <Link
             href="/"
             className="w-full flex items-center justify-center space-x-2 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-xl transition-all text-sm"

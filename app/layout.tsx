@@ -1,11 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import DbStatusMonitor from "@/components/DbStatusMonitor";
-import { startNetworkMonitor } from "@/lib/db-sync";
 import "./globals.css";
-
-// 启动网络监控
-startNetworkMonitor();
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

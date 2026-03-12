@@ -28,26 +28,8 @@ export async function GET(request: NextRequest) {
       });
     }
     
-    // 查询管理员列表
-    const admins = await withRetry(async () => {
-      return await sql`
-        SELECT id, username, qq FROM admins
-        WHERE is_owner = TRUE OR id > 0
-      `;
-    });
-    
-    // 添加管理员账号到白名单列表
-    const adminAccounts = admins.map(admin => ({
-      id: -admin.id, // 使用负数ID避免冲突
-      minecraft_id: admin.username,
-      age: 18,
-      contact: `QQ: ${admin.qq}`,
-      reviewed_by: '系统',
-      reviewed_at: new Date().toISOString(),
-      created_at: new Date().toISOString()
-    }));
-    
-    whitelist = [...adminAccounts, ...whitelist];
+    // 只返回真实的白名单申请记录，不添加管理员账号
+    // 管理员账号将通过其他方式管理
     
     return NextResponse.json({
       success: true,

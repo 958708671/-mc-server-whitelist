@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { questionCategories, serverRuleQuestions } from '@/data/questions';
 import type { Question, QuestionCategory } from '@/data/questions';
@@ -23,8 +23,8 @@ export default function ApplyPage() {
   const [failedRequired, setFailedRequired] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
-  const [errors, setErrors] = useState<Record<string, string>>({});
   const [newBannedServer, setNewBannedServer] = useState('');
+  const [showAnswers, setShowAnswers] = useState(false);
   
   const [formData, setFormData] = useState({
     minecraftId: '',
@@ -38,11 +38,12 @@ export default function ApplyPage() {
     bannedServers: [] as string[]
   });
 
-  const totalQuestions = 30;
-  const singleChoiceCount = 15;
-  const multipleChoiceCount = 10;
-  const judgmentChoiceCount = 5;
-  const ruleQuestionCount = 5;
+  // 固定题目数量
+  const TOTAL_QUESTIONS = 30;
+  const SINGLE_CHOICE_COUNT = 15;
+  const MULTIPLE_CHOICE_COUNT = 10;
+  const JUDGMENT_COUNT = 5;
+  const REQUIRED_QUESTIONS_COUNT = 5;
 
   const handleCategoryToggle = (categoryId: string) => {
     setSelectedCategories(prev => {
@@ -93,6 +94,18 @@ export default function ApplyPage() {
     return [...new Set(skillTypes)];
   };
 
+  // 获取了解程度文字
+  const getProficiencyLabel = (value: number): string => {
+    const labels: Record<number, string> = {
+      1: '入门',
+      2: '了解',
+      3: '熟悉',
+      4: '熟练',
+      5: '精通'
+    };
+    return labels[value] || '入门';
+  };
+
   const generateQuiz = () => {
     const categoryIds = Object.keys(selectedCategories);
     if (categoryIds.length === 0) return;
@@ -101,267 +114,116 @@ export default function ApplyPage() {
       return;
     }
 
-    const selectedQuestions: QuizQuestion[] = [];
+    // 收集所有可用题目
+    const allSingleQuestions: QuizQuestion[] = [];
+    const allMultipleQuestions: QuizQuestion[] = [];
+    const allJudgmentQuestions: QuizQuestion[] = [];
 
-    const totalServerRuleQuestions = ruleQuestionCount;
-    const totalCategorySingleQuestions = singleChoiceCount - totalServerRuleQuestions;
-    const totalCategoryMultipleQuestions = multipleChoiceCount;
-    const totalCategoryJudgmentQuestions = judgmentChoiceCount;
-
-    const ruleSingleQuestions = serverRuleQuestions.filter(q => q.type === 'single');
-    const ruleMultipleQuestions = serverRuleQuestions.filter(q => q.type === 'multiple');
-    const ruleJudgmentQuestions = serverRuleQuestions.filter(q => q.type === 'judgment');
-    
-    const ruleRequiredSingle = ruleSingleQuestions.filter(q => q.required);
-    if (ruleRequiredSingle.length > 0) {
-      const randomRuleSingle = ruleRequiredSingle[Math.floor(Math.random() * ruleRequiredSingle.length)];
-      selectedQuestions.push({
-        ...randomRuleSingle,
-        categoryId: 'rules',
-        categoryName: '服务器规则'
-      });
-    }
-    
-    const ruleRequiredMultiple = ruleMultipleQuestions.filter(q => q.required);
-    if (ruleRequiredMultiple.length > 0) {
-      const randomRuleMultiple = ruleRequiredMultiple[Math.floor(Math.random() * ruleRequiredMultiple.length)];
-      selectedQuestions.push({
-        ...randomRuleMultiple,
-        categoryId: 'rules',
-        categoryName: '服务器规则'
-      });
-    }
-    
-    const ruleRequiredJudgment = ruleJudgmentQuestions.filter(q => q.required);
-    if (ruleRequiredJudgment.length > 0) {
-      const randomRuleJudgment = ruleRequiredJudgment[Math.floor(Math.random() * ruleRequiredJudgment.length)];
-      selectedQuestions.push({
-        ...randomRuleJudgment,
-        categoryId: 'rules',
-        categoryName: '服务器规则'
-      });
-    }
-    
-    const ruleNormalQuestions = serverRuleQuestions.filter(q => !q.required);
-    const shuffledRuleNormal = [...ruleNormalQuestions].sort(() => Math.random() - 0.5);
-    const pickedRuleNormal = shuffledRuleNormal.slice(0, totalServerRuleQuestions - 3);
-    
-    pickedRuleNormal.forEach(q => {
-      selectedQuestions.push({
+    // 从服务器规则中添加题目
+    serverRuleQuestions.forEach(q => {
+      const quizQ: QuizQuestion = {
         ...q,
         categoryId: 'rules',
         categoryName: '服务器规则'
-      });
+      };
+      if (q.type === 'single') allSingleQuestions.push(quizQ);
+      else if (q.type === 'multiple') allMultipleQuestions.push(quizQ);
+      else if (q.type === 'judgment') allJudgmentQuestions.push(quizQ);
     });
 
-    const totalWeight = Object.values(selectedCategories).reduce((a, b) => a + b, 0);
-    const questionsPerCategory: Record<string, { single: number, multiple: number, judgment: number }> = {};
-    
-    categoryIds.forEach(id => {
-      const weight = selectedCategories[id];
-      const singleCount = Math.round((weight / totalWeight) * totalCategorySingleQuestions);
-      const multipleCount = Math.round((weight / totalWeight) * totalCategoryMultipleQuestions);
-      const judgmentCount = Math.round((weight / totalWeight) * totalCategoryJudgmentQuestions);
-      questionsPerCategory[id] = { single: singleCount, multiple: multipleCount, judgment: judgmentCount };
-    });
-
-    let totalSingleAssigned = Object.values(questionsPerCategory).reduce((a, b) => a + b.single, 0);
-    let totalMultipleAssigned = Object.values(questionsPerCategory).reduce((a, b) => a + b.multiple, 0);
-    let totalJudgmentAssigned = Object.values(questionsPerCategory).reduce((a, b) => a + b.judgment, 0);
-    
-    const singleDiff = totalCategorySingleQuestions - totalSingleAssigned;
-    const multipleDiff = totalCategoryMultipleQuestions - totalMultipleAssigned;
-    const judgmentDiff = totalCategoryJudgmentQuestions - totalJudgmentAssigned;
-    
-    if (singleDiff !== 0 && categoryIds.length > 0) {
-      const firstId = categoryIds[0];
-      questionsPerCategory[firstId].single = (questionsPerCategory[firstId].single || 0) + singleDiff;
-    }
-    
-    if (multipleDiff !== 0 && categoryIds.length > 0) {
-      const firstId = categoryIds[0];
-      questionsPerCategory[firstId].multiple = (questionsPerCategory[firstId].multiple || 0) + multipleDiff;
-    }
-    
-    if (judgmentDiff !== 0 && categoryIds.length > 0) {
-      const firstId = categoryIds[0];
-      questionsPerCategory[firstId].judgment = (questionsPerCategory[firstId].judgment || 0) + judgmentDiff;
-    }
-
+    // 从选择的分类中添加题目
     categoryIds.forEach(categoryId => {
       const category = questionCategories.find(c => c.id === categoryId);
       if (!category) return;
 
-      const categoryRequiredSingle = category.questions.filter(q => q.type === 'single' && q.required);
-      if (categoryRequiredSingle.length > 0) {
-        const randomRequiredSingle = categoryRequiredSingle[Math.floor(Math.random() * categoryRequiredSingle.length)];
-        selectedQuestions.push({
-          ...randomRequiredSingle,
-          categoryId: category.id,
-          categoryName: category.name
-        });
-      }
-
-      const categoryRequiredMultiple = category.questions.filter(q => q.type === 'multiple' && q.required);
-      if (categoryRequiredMultiple.length > 0) {
-        const randomRequiredMultiple = categoryRequiredMultiple[Math.floor(Math.random() * categoryRequiredMultiple.length)];
-        selectedQuestions.push({
-          ...randomRequiredMultiple,
-          categoryId: category.id,
-          categoryName: category.name
-        });
-      }
-
-      const categoryRequiredJudgment = category.questions.filter(q => q.type === 'judgment' && q.required);
-      if (categoryRequiredJudgment.length > 0) {
-        const randomRequiredJudgment = categoryRequiredJudgment[Math.floor(Math.random() * categoryRequiredJudgment.length)];
-        selectedQuestions.push({
-          ...randomRequiredJudgment,
-          categoryId: category.id,
-          categoryName: category.name
-        });
-      }
-    });
-
-    categoryIds.forEach(categoryId => {
-      const category = questionCategories.find(c => c.id === categoryId);
-      if (!category) return;
-
-      const count = questionsPerCategory[categoryId].single;
-      const categoryNormalSingle = category.questions.filter(q => q.type === 'single' && !q.required);
-      const shuffledSingle = [...categoryNormalSingle].sort(() => Math.random() - 0.5);
-      const pickedSingle = shuffledSingle.slice(0, count);
-      
-      pickedSingle.forEach(q => {
-        selectedQuestions.push({
+      category.questions.forEach(q => {
+        const quizQ: QuizQuestion = {
           ...q,
           categoryId: category.id,
           categoryName: category.name
-        });
+        };
+        if (q.type === 'single') allSingleQuestions.push(quizQ);
+        else if (q.type === 'multiple') allMultipleQuestions.push(quizQ);
+        else if (q.type === 'judgment') allJudgmentQuestions.push(quizQ);
       });
     });
 
-    categoryIds.forEach(categoryId => {
-      const category = questionCategories.find(c => c.id === categoryId);
-      if (!category) return;
+    // 随机选择必选题（每类1-2道，共5道）
+    const selectedQuestions: QuizQuestion[] = [];
+    const requiredQuestionIds: Set<string> = new Set();
 
-      const count = questionsPerCategory[categoryId].multiple;
-      const categoryNormalMultiple = category.questions.filter(q => q.type === 'multiple' && !q.required);
-      const shuffledMultiple = [...categoryNormalMultiple].sort(() => Math.random() - 0.5);
-      const pickedMultiple = shuffledMultiple.slice(0, count);
-      
-      pickedMultiple.forEach(q => {
-        selectedQuestions.push({
-          ...q,
-          categoryId: category.id,
-          categoryName: category.name
-        });
-      });
-    });
-
-    categoryIds.forEach(categoryId => {
-      const category = questionCategories.find(c => c.id === categoryId);
-      if (!category) return;
-
-      const count = questionsPerCategory[categoryId].judgment;
-      const categoryNormalJudgment = category.questions.filter(q => q.type === 'judgment' && !q.required);
-      const shuffledJudgment = [...categoryNormalJudgment].sort(() => Math.random() - 0.5);
-      const pickedJudgment = shuffledJudgment.slice(0, count);
-      
-      pickedJudgment.forEach(q => {
-        selectedQuestions.push({
-          ...q,
-          categoryId: category.id,
-          categoryName: category.name
-        });
-      });
-    });
-
-    while (selectedQuestions.length > totalQuestions) {
-      const randomIndex = Math.floor(Math.random() * selectedQuestions.length);
-      if (!selectedQuestions[randomIndex].required) {
-        selectedQuestions.splice(randomIndex, 1);
-      }
-    }
-
-    while (selectedQuestions.length < totalQuestions) {
-      const allNormalQuestions: QuizQuestion[] = [];
-      
-      categoryIds.forEach(categoryId => {
-        const category = questionCategories.find(c => c.id === categoryId);
-        if (!category) return;
-        
-        const normalQuestions = category.questions.filter(q => !q.required);
-        normalQuestions.forEach(q => {
-          if (!selectedQuestions.some(sq => sq.id === q.id && sq.categoryId === categoryId)) {
-            allNormalQuestions.push({
-              ...q,
-              categoryId: category.id,
-              categoryName: category.name
-            });
-          }
-        });
-      });
-      
-      const ruleNormalQuestionsRemaining = serverRuleQuestions.filter(q => !q.required);
-      ruleNormalQuestionsRemaining.forEach(q => {
-        if (!selectedQuestions.some(sq => sq.id === q.id && sq.categoryId === 'rules')) {
-          allNormalQuestions.push({
-            ...q,
-            categoryId: 'rules',
-            categoryName: '服务器规则'
-          });
-        }
-      });
-      
-      if (allNormalQuestions.length > 0) {
-        const randomIndex = Math.floor(Math.random() * allNormalQuestions.length);
-        selectedQuestions.push(allNormalQuestions[randomIndex]);
-      } else {
-        break;
-      }
-    }
-
-    const singleChoiceQuestions = selectedQuestions.filter(q => q.type === 'single');
-    const multipleChoiceQuestions = selectedQuestions.filter(q => q.type === 'multiple');
-    const judgmentChoiceQuestions = selectedQuestions.filter(q => q.type === 'judgment');
-
+    // 单选必选题：1-2道
     const singleRequiredCount = Math.floor(Math.random() * 2) + 1;
-    const shuffledSingleReq = [...singleChoiceQuestions].sort(() => Math.random() - 0.5);
-    const singleRequiredQuestions = shuffledSingleReq.slice(0, singleRequiredCount);
+    const shuffledSingle = [...allSingleQuestions].sort(() => Math.random() - 0.5);
+    for (let i = 0; i < singleRequiredCount && i < shuffledSingle.length; i++) {
+      const q = { ...shuffledSingle[i], required: true };
+      selectedQuestions.push(q);
+      requiredQuestionIds.add(`${q.categoryId}-${q.id}`);
+    }
 
+    // 多选必选题：1-2道
     const multipleRequiredCount = Math.floor(Math.random() * 2) + 1;
-    const shuffledMultipleReq = [...multipleChoiceQuestions].sort(() => Math.random() - 0.5);
-    const multipleRequiredQuestions = shuffledMultipleReq.slice(0, multipleRequiredCount);
-
-    const judgmentRequiredCount = Math.floor(Math.random() * 2) + 1;
-    const shuffledJudgmentReq = [...judgmentChoiceQuestions].sort(() => Math.random() - 0.5);
-    const judgmentRequiredQuestions = shuffledJudgmentReq.slice(0, judgmentRequiredCount);
-
-    selectedQuestions.forEach(q => {
-      const isSingleRequired = singleRequiredQuestions.some(sq => sq.id === q.id && sq.categoryId === q.categoryId);
-      const isMultipleRequired = multipleRequiredQuestions.some(mq => mq.id === q.id && mq.categoryId === q.categoryId);
-      const isJudgmentRequired = judgmentRequiredQuestions.some(jq => jq.id === q.id && jq.categoryId === q.categoryId);
-      
-      if (isSingleRequired || isMultipleRequired || isJudgmentRequired) {
-        q.required = true;
+    const shuffledMultiple = [...allMultipleQuestions].sort(() => Math.random() - 0.5);
+    let multipleRequiredAdded = 0;
+    for (const q of shuffledMultiple) {
+      if (multipleRequiredAdded >= multipleRequiredCount) break;
+      const key = `${q.categoryId}-${q.id}`;
+      if (!requiredQuestionIds.has(key)) {
+        selectedQuestions.push({ ...q, required: true });
+        requiredQuestionIds.add(key);
+        multipleRequiredAdded++;
       }
-    });
+    }
 
-    const singleQuestions = selectedQuestions.filter(q => q.type === 'single');
-    const multipleQuestions = selectedQuestions.filter(q => q.type === 'multiple');
-    const judgmentQuestions = selectedQuestions.filter(q => q.type === 'judgment');
-    
-    const finalShuffledSingle = singleQuestions.sort(() => Math.random() - 0.5);
-    const finalShuffledMultiple = multipleQuestions.sort(() => Math.random() - 0.5);
-    const finalShuffledJudgment = judgmentQuestions.sort(() => Math.random() - 0.5);
-    
+    // 判断必选题：1-2道（确保总共5道）
+    const judgmentRequiredCount = REQUIRED_QUESTIONS_COUNT - singleRequiredCount - multipleRequiredCount;
+    const shuffledJudgment = [...allJudgmentQuestions].sort(() => Math.random() - 0.5);
+    let judgmentRequiredAdded = 0;
+    for (const q of shuffledJudgment) {
+      if (judgmentRequiredAdded >= judgmentRequiredCount) break;
+      const key = `${q.categoryId}-${q.id}`;
+      if (!requiredQuestionIds.has(key)) {
+        selectedQuestions.push({ ...q, required: true });
+        requiredQuestionIds.add(key);
+        judgmentRequiredAdded++;
+      }
+    }
+
+    // 补充普通题目到指定数量
+    const remainingSingle = SINGLE_CHOICE_COUNT - singleRequiredCount;
+    const remainingMultiple = MULTIPLE_CHOICE_COUNT - multipleRequiredCount;
+    const remainingJudgment = JUDGMENT_COUNT - judgmentRequiredCount;
+
+    // 添加单选题
+    const normalSingle = shuffledSingle.filter(q => !requiredQuestionIds.has(`${q.categoryId}-${q.id}`));
+    for (let i = 0; i < remainingSingle && i < normalSingle.length; i++) {
+      selectedQuestions.push({ ...normalSingle[i], required: false });
+    }
+
+    // 添加多选题
+    const normalMultiple = shuffledMultiple.filter(q => !requiredQuestionIds.has(`${q.categoryId}-${q.id}`));
+    for (let i = 0; i < remainingMultiple && i < normalMultiple.length; i++) {
+      selectedQuestions.push({ ...normalMultiple[i], required: false });
+    }
+
+    // 添加判断题
+    const normalJudgment = shuffledJudgment.filter(q => !requiredQuestionIds.has(`${q.categoryId}-${q.id}`));
+    for (let i = 0; i < remainingJudgment && i < normalJudgment.length; i++) {
+      selectedQuestions.push({ ...normalJudgment[i], required: false });
+    }
+
+    // 按题型分类并打乱顺序
+    const singleQuestions = selectedQuestions.filter(q => q.type === 'single').sort(() => Math.random() - 0.5);
+    const multipleQuestions = selectedQuestions.filter(q => q.type === 'multiple').sort(() => Math.random() - 0.5);
+    const judgmentQuestions = selectedQuestions.filter(q => q.type === 'judgment').sort(() => Math.random() - 0.5);
+
+    // 最终题目顺序：单选 -> 多选 -> 判断
     const finalQuestions = [
-      ...finalShuffledSingle.slice(0, 15),
-      ...finalShuffledMultiple.slice(0, 10),
-      ...finalShuffledJudgment.slice(0, 5)
+      ...singleQuestions.slice(0, SINGLE_CHOICE_COUNT),
+      ...multipleQuestions.slice(0, MULTIPLE_CHOICE_COUNT),
+      ...judgmentQuestions.slice(0, JUDGMENT_COUNT)
     ];
-    
+
     setQuizQuestions(finalQuestions);
     setCurrentStep(1);
     setCurrentQuestionIndex(0);
@@ -369,6 +231,7 @@ export default function ApplyPage() {
     setShowResult(false);
     setShowQuestionNav(false);
     setFailedRequired(false);
+    setShowAnswers(false);
   };
 
   const handleOptionToggle = (optionIndex: number) => {
@@ -400,22 +263,38 @@ export default function ApplyPage() {
     const currentAnswers = userAnswers[currentQuestionIndex] || [];
     if (currentAnswers.length === 0) return;
 
-    const currentQuestion = quizQuestions[currentQuestionIndex];
-    const correctAnswer = Array.isArray(currentQuestion.correct) ? currentQuestion.correct : [currentQuestion.correct];
-    const isCorrect = currentAnswers.length === correctAnswer.length && 
-                      currentAnswers.every(a => correctAnswer.includes(a));
-    
-    if (currentQuestion.required && !isCorrect) {
-      setFailedRequired(true);
-      setShowResult(true);
-      return;
-    }
-
     if (currentQuestionIndex < quizQuestions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     } else {
-      setShowResult(true);
+      // 所有题目答完，显示结果
+      checkAllAnswers();
     }
+  };
+
+  const checkAllAnswers = () => {
+    let wrongRequiredCount = 0;
+    let correctCount = 0;
+
+    quizQuestions.forEach((question, index) => {
+      const userAnswer = userAnswers[index] || [];
+      const correctAnswer = Array.isArray(question.correct) ? question.correct : [question.correct];
+      const isCorrect = userAnswer.length === correctAnswer.length && 
+                        userAnswer.every(a => correctAnswer.includes(a));
+      
+      if (isCorrect) {
+        correctCount++;
+      } else if (question.required) {
+        wrongRequiredCount++;
+      }
+    });
+
+    // 必选题答错则考试不通过
+    if (wrongRequiredCount > 0) {
+      setFailedRequired(true);
+    }
+
+    setShowResult(true);
+    setShowAnswers(true);
   };
 
   const handlePrevQuestion = () => {
@@ -443,7 +322,7 @@ export default function ApplyPage() {
     const total = quizQuestions.length;
     const passRate = score / total;
     
-    if (passRate >= 0.85) {
+    if (passRate >= 0.85 && !failedRequired) {
       const selectedCategoryIds = Object.keys(selectedCategories);
       const uniqueSkillTypes = generateSkillTypes(selectedCategoryIds);
       
@@ -458,6 +337,7 @@ export default function ApplyPage() {
       setShowResult(false);
       setCurrentQuestionIndex(0);
       setUserAnswers({});
+      setShowAnswers(false);
     }
   };
 
@@ -533,6 +413,8 @@ export default function ApplyPage() {
     setShowResult(false);
     setQuizPassed(false);
     setShowQuestionNav(false);
+    setFailedRequired(false);
+    setShowAnswers(false);
     setFormData(prev => ({
       ...prev,
       skillType: []
@@ -575,6 +457,7 @@ export default function ApplyPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
               {questionCategories.map(category => {
                 const isSelected = selectedCategories[category.id] !== undefined;
+                const proficiency = selectedCategories[category.id] || 1;
                 return (
                   <div
                     key={category.id}
@@ -600,14 +483,17 @@ export default function ApplyPage() {
                           type="range"
                           min="1"
                           max="5"
-                          value={selectedCategories[category.id]}
+                          value={proficiency}
                           onChange={(e) => handleWeightChange(category.id, parseInt(e.target.value))}
                           onClick={(e) => e.stopPropagation()}
                           className="w-full mt-1"
                         />
-                        <div className="flex justify-between text-xs text-gray-500">
-                          <span>入门</span>
-                          <span>精通</span>
+                        <div className="flex justify-between text-xs text-gray-400 mt-1">
+                          <span className={proficiency === 1 ? 'text-green-400 font-bold' : ''}>入门</span>
+                          <span className={proficiency === 2 ? 'text-green-400 font-bold' : ''}>了解</span>
+                          <span className={proficiency === 3 ? 'text-green-400 font-bold' : ''}>熟悉</span>
+                          <span className={proficiency === 4 ? 'text-green-400 font-bold' : ''}>熟练</span>
+                          <span className={proficiency === 5 ? 'text-green-400 font-bold' : ''}>精通</span>
                         </div>
                       </div>
                     )}
@@ -753,60 +639,126 @@ export default function ApplyPage() {
                     : 'bg-blue-600 hover:bg-blue-700 text-white'
                 }`}
               >
-                {currentQuestionIndex === quizQuestions.length - 1 ? '提交' : '下一题'}
+                {currentQuestionIndex === quizQuestions.length - 1 ? '提交试卷' : '下一题'}
               </button>
             </div>
           </div>
         )}
 
         {showResult && (
-          <div className="bg-gray-800/50 rounded-2xl p-8 border border-gray-700 text-center">
+          <div className="bg-gray-800/50 rounded-2xl p-8 border border-gray-700">
             {failedRequired ? (
-              <>
+              <div className="text-center">
                 <div className="text-6xl mb-4">❌</div>
                 <h2 className="text-2xl font-bold text-red-400 mb-4">必答题答错</h2>
-                <p className="text-gray-400 mb-6">您没有答对必答题，试卷已作废，请重新答题。</p>
+                <p className="text-gray-400 mb-6">您没有答对必答题，考试不通过，请重新答题。</p>
+                <div className="text-left mb-6 bg-gray-900/50 p-4 rounded-lg">
+                  <h3 className="text-white font-semibold mb-3">错题回顾：</h3>
+                  {quizQuestions.map((question, index) => {
+                    const userAnswer = userAnswers[index] || [];
+                    const correctAnswer = Array.isArray(question.correct) ? question.correct : [question.correct];
+                    const isCorrect = userAnswer.length === correctAnswer.length && 
+                                      userAnswer.every(a => correctAnswer.includes(a));
+                    
+                    if (question.required && !isCorrect) {
+                      return (
+                        <div key={index} className="mb-4 p-3 bg-red-500/10 rounded border border-red-500/30">
+                          <p className="text-red-400 font-semibold mb-2">必答题 {index + 1} (答错)</p>
+                          <p className="text-white mb-2">{question.question}</p>
+                          <p className="text-gray-400 text-sm">
+                            正确答案: {correctAnswer.map(i => `${String.fromCharCode(65 + i)}.${question.options[i]}`).join(', ')}
+                          </p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })}
+                </div>
                 <button
                   onClick={resetQuiz}
                   className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all"
                 >
                   重新答题
                 </button>
-              </>
+              </div>
             ) : (
-              <>
-                <div className="text-6xl mb-4">
-                  {calculateScore() / quizQuestions.length >= 0.85 ? '✅' : '❌'}
+              <div>
+                <div className="text-center mb-6">
+                  <div className="text-6xl mb-4">
+                    {calculateScore() / quizQuestions.length >= 0.85 ? '✅' : '❌'}
+                  </div>
+                  <h2 className="text-2xl font-bold text-white mb-4">
+                    {calculateScore() / quizQuestions.length >= 0.85 ? '测试通过！' : '测试未通过'}
+                  </h2>
+                  <p className="text-3xl font-bold text-blue-400 mb-2">
+                    {calculateScore()} / {quizQuestions.length}
+                  </p>
+                  <p className="text-gray-400 mb-6">
+                    正确率: {((calculateScore() / quizQuestions.length) * 100).toFixed(1)}%
+                    {calculateScore() / quizQuestions.length >= 0.85 
+                      ? ' (≥85% 通过)' 
+                      : ' (需要 ≥85% 才能通过)'}
+                  </p>
                 </div>
-                <h2 className="text-2xl font-bold text-white mb-4">
-                  {calculateScore() / quizQuestions.length >= 0.85 ? '测试通过！' : '测试未通过'}
-                </h2>
-                <p className="text-3xl font-bold text-blue-400 mb-2">
-                  {calculateScore()} / {quizQuestions.length}
-                </p>
-                <p className="text-gray-400 mb-6">
-                  正确率: {((calculateScore() / quizQuestions.length) * 100).toFixed(1)}%
-                  {calculateScore() / quizQuestions.length >= 0.85 
-                    ? ' (≥85% 通过)' 
-                    : ' (需要 ≥85% 才能通过)'}
-                </p>
 
-                {calculateScore() / quizQuestions.length >= 0.85 ? (
-                  <button
-                    onClick={handleQuizComplete}
-                    className="px-8 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all"
-                  >
-                    填写申请表
-                  </button>
-                ) : (
-                  <button
-                    onClick={resetQuiz}
-                    className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all"
-                  >
-                    重新答题
-                  </button>
-                )}
-              </>
+                {/* 显示所有题目和答案 */}
+                <div className="text-left mb-6 bg-gray-900/50 p-4 rounded-lg max-h-96 overflow-y-auto">
+                  <h3 className="text-white font-semibold mb-3">答题详情：</h3>
+                  {quizQuestions.map((question, index) => {
+                    const userAnswer = userAnswers[index] || [];
+                    const correctAnswer = Array.isArray(question.correct) ? question.correct : [question.correct];
+                    const isCorrect = userAnswer.length === correctAnswer.length && 
+                                      userAnswer.every(a => correctAnswer.includes(a));
+                    
+                    return (
+                      <div key={index} className={`mb-4 p-3 rounded border ${
+                        isCorrect 
+                          ? 'bg-green-500/10 border-green-500/30' 
+                          : 'bg-red-500/10 border-red-500/30'
+                      }`}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className={`text-sm ${isCorrect ? 'text-green-400' : 'text-red-400'}`}>
+                            {isCorrect ? '✓' : '✗'} 第{index + 1}题
+                          </span>
+                          {question.required && (
+                            <span className="px-2 py-0.5 rounded text-xs bg-red-500/20 text-red-400">
+                              必答
+                            </span>
+                          )}
+                          <span className="text-gray-500 text-xs">{question.categoryName}</span>
+                        </div>
+                        <p className="text-white mb-2">{question.question}</p>
+                        <p className="text-gray-400 text-sm">
+                          您的答案: {userAnswer.length > 0 
+                            ? userAnswer.map(i => `${String.fromCharCode(65 + i)}.${question.options[i]}`).join(', ')
+                            : '未作答'}
+                        </p>
+                        <p className="text-green-400 text-sm">
+                          正确答案: {correctAnswer.map(i => `${String.fromCharCode(65 + i)}.${question.options[i]}`).join(', ')}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="text-center">
+                  {calculateScore() / quizQuestions.length >= 0.85 ? (
+                    <button
+                      onClick={handleQuizComplete}
+                      className="px-8 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all"
+                    >
+                      填写申请表
+                    </button>
+                  ) : (
+                    <button
+                      onClick={resetQuiz}
+                      className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all"
+                    >
+                      重新答题
+                    </button>
+                  )}
+                </div>
+              </div>
             )}
           </div>
         )}

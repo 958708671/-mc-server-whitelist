@@ -14,6 +14,7 @@ interface Event {
   status: string;
   created_by: string | null;
   created_at: string;
+  sort_order: number;
 }
 
 export default function EventsPage() {
@@ -207,8 +208,6 @@ export default function EventsPage() {
     }
   };
 
-
-
   const handleEdit = (event: Event) => {
     setEditingId(event.id);
     setFormData({
@@ -238,13 +237,10 @@ export default function EventsPage() {
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '未设置';
-    return new Date(dateStr).toLocaleString('zh-CN', {
+    return new Date(dateStr).toLocaleDateString('zh-CN', {
       year: 'numeric',
       month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
+      day: '2-digit'
     });
   };
 
@@ -258,6 +254,68 @@ export default function EventsPage() {
         return <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs">已取消</span>;
       default:
         return <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs">即将开始</span>;
+    }
+  };
+
+  const handleMoveUp = async (id: number, currentOrder: number) => {
+    const sortedEvents = [...events].sort((a, b) => a.sort_order - b.sort_order);
+    const currentIndex = sortedEvents.findIndex(e => e.id === id);
+    
+    if (currentIndex > 0) {
+      const prevEvent = sortedEvents[currentIndex - 1];
+      
+      setProcessing(true);
+      try {
+        // 交换排序值
+        await Promise.all([
+          fetch('/api/events', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: id, sort_order: prevEvent.sort_order })
+          }),
+          fetch('/api/events', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: prevEvent.id, sort_order: currentOrder })
+          })
+        ]);
+        fetchEvents();
+      } catch (error) {
+        alert('移动失败，请重试');
+      } finally {
+        setProcessing(false);
+      }
+    }
+  };
+
+  const handleMoveDown = async (id: number, currentOrder: number) => {
+    const sortedEvents = [...events].sort((a, b) => a.sort_order - b.sort_order);
+    const currentIndex = sortedEvents.findIndex(e => e.id === id);
+    
+    if (currentIndex < sortedEvents.length - 1) {
+      const nextEvent = sortedEvents[currentIndex + 1];
+      
+      setProcessing(true);
+      try {
+        // 交换排序值
+        await Promise.all([
+          fetch('/api/events', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: id, sort_order: nextEvent.sort_order })
+          }),
+          fetch('/api/events', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: nextEvent.id, sort_order: currentOrder })
+          })
+        ]);
+        fetchEvents();
+      } catch (error) {
+        alert('移动失败，请重试');
+      } finally {
+        setProcessing(false);
+      }
     }
   };
 
@@ -322,6 +380,7 @@ export default function EventsPage() {
                     className="w-4 h-4 rounded bg-gray-700 border-gray-600 text-cyan-500 focus:ring-cyan-500"
                   />
                 </th>
+                <th className="text-left px-4 py-3 text-gray-400 font-medium">排序</th>
                 <th className="text-left px-4 py-3 text-gray-400 font-medium">标题</th>
                 <th className="text-left px-4 py-3 text-gray-400 font-medium">状态</th>
                 <th className="text-left px-4 py-3 text-gray-400 font-medium">开始时间</th>
@@ -339,6 +398,24 @@ export default function EventsPage() {
                       onChange={() => toggleSelect(event.id)}
                       className="w-4 h-4 rounded bg-gray-700 border-gray-600 text-cyan-500 focus:ring-cyan-500"
                     />
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-col items-center gap-1">
+                      <button
+                        onClick={() => handleMoveUp(event.id, event.sort_order)}
+                        disabled={processing}
+                        className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        onClick={() => handleMoveDown(event.id, event.sort_order)}
+                        disabled={processing}
+                        className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        ↓
+                      </button>
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-white font-medium">{event.title}</td>
                   <td className="px-4 py-3">{getStatusBadge(event.status)}</td>

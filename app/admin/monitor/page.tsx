@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
+import SyncMonitor from '@/components/SyncMonitor';
 
 interface LoginRecord {
   id: number;
@@ -193,6 +194,8 @@ export default function AdminMonitorPage() {
           </table>
         </div>
       </div>
+      
+      <SyncMonitor />
     </div>
   );
 }

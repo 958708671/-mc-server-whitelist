@@ -49,8 +49,12 @@ export default function WhitelistPage() {
       const response = await fetch(url);
       const result = await response.json();
       if (result.success) {
-        setPlayers(result.data);
-        calculateStats(result.data);
+        // 过滤掉系统审核的记录，只显示由真实管理员审核的记录
+        const filteredPlayers = result.data.filter((player: WhitelistPlayer) => 
+          player.reviewed_by && player.reviewed_by !== '系统'
+        );
+        setPlayers(filteredPlayers);
+        calculateStats(filteredPlayers);
         setSelectedIds(new Set());
       }
     } catch (error) {

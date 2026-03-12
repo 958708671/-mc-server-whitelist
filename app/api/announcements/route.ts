@@ -13,12 +13,12 @@ export async function GET(request: NextRequest) {
       announcements = await sql`
         SELECT * FROM announcements 
         WHERE (expires_at IS NULL OR expires_at > NOW())
-        ORDER BY is_pinned DESC, created_at DESC
+        ORDER BY is_pinned DESC, sort_order ASC, created_at DESC
       `;
     } else {
       announcements = await sql`
         SELECT * FROM announcements 
-        ORDER BY is_pinned DESC, created_at DESC
+        ORDER BY is_pinned DESC, sort_order ASC, created_at DESC
       `;
     }
     
@@ -47,9 +47,15 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    // 获取当前最大的sort_order值
+    const maxSortOrder = await sql`
+      SELECT COALESCE(MAX(sort_order), 0) as max_order FROM announcements
+    `;
+    const newSortOrder = (maxSortOrder[0].max_order || 0) + 1;
+    
     await sql`
-      INSERT INTO announcements (title, content, type, is_pinned, created_by, created_by_id, expires_at)
-      VALUES (${title}, ${content}, ${type || 'normal'}, ${is_pinned || false}, ${created_by || null}, ${created_by_id || null}, ${expires_at || null})
+      INSERT INTO announcements (title, content, type, is_pinned, created_by, created_by_id, expires_at, sort_order)
+      VALUES (${title}, ${content}, ${type || 'normal'}, ${is_pinned || false}, ${created_by || null}, ${created_by_id || null}, ${expires_at || null}, ${newSortOrder})
     `;
     
     return NextResponse.json({
@@ -60,6 +66,35 @@ export async function POST(request: NextRequest) {
     console.error('发布公告失败:', error);
     return NextResponse.json(
       { success: false, message: '发布公告失败' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const data = await request.json();
+    const { id, sort_order } = data;
+    
+    if (!id || sort_order === undefined) {
+      return NextResponse.json(
+        { success: false, message: '缺少必要参数' },
+        { status: 400 }
+      );
+    }
+    
+    await sql`
+      UPDATE announcements SET sort_order = ${sort_order} WHERE id = ${id}
+    `;
+    
+    return NextResponse.json({
+      success: true,
+      message: '排序更新成功'
+    });
+  } catch (error) {
+    console.error('更新排序失败:', error);
+    return NextResponse.json(
+      { success: false, message: '更新排序失败' },
       { status: 500 }
     );
   }
