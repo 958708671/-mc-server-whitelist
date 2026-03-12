@@ -3,7 +3,7 @@ import sql, { withRetry } from '@/lib/db';
 import nodemailer from 'nodemailer';
 import { exec } from 'child_process';
 import path from 'path';
-import { notifyUserApplicationApproved, notifyUserApplicationRejected } from '@/lib/qq-bot';
+
 
 const rconAddToWhitelist = (
   host: string,
@@ -381,16 +381,7 @@ export async function PATCH(
         })();
       }
       
-      // 发送QQ通知 - 异步执行，不阻塞响应
-      if (/^\d+$/.test(contact)) {
-        (async () => {
-          try {
-            await notifyUserApplicationApproved(contact, minecraftId, qqGroup, downloadUrl);
-          } catch (error) {
-            console.error('发送QQ审核通过通知失败:', error);
-          }
-        })();
-      }
+
       
     } else if (status === 'rejected') {
       // 更新申请状态
@@ -430,16 +421,7 @@ export async function PATCH(
         })();
       }
       
-      // 发送QQ通知 - 异步执行，不阻塞响应
-      if (/^\d+$/.test(contact)) {
-        (async () => {
-          try {
-            await notifyUserApplicationRejected(contact, minecraftId, note || '');
-          } catch (error) {
-            console.error('发送QQ审核拒绝通知失败:', error);
-          }
-        })();
-      }
+
       
     } else {
       return NextResponse.json(
