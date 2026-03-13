@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sql, { withRetry } from '@/lib/db';
-
+import { notifyAdminsNewApplication } from '@/lib/qq-bot';
 
 // 动态导入nodemailer
 let transporter: any;
@@ -268,7 +268,14 @@ export async function POST(request: NextRequest) {
       // 邮件失败不影响整个请求的成功
     }
     
-
+    // 通知管理员有新的白名单申请（QQ机器人）
+    try {
+      await notifyAdminsNewApplication(minecraft_id, contact, age);
+      console.log('QQ机器人通知管理员成功');
+    } catch (qqError) {
+      console.error('QQ机器人通知失败:', qqError);
+      // QQ通知失败不影响整个请求的成功
+    }
     
     return NextResponse.json({
       success: true,
