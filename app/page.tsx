@@ -1457,7 +1457,7 @@ export default function HomePage() {
           className="min-h-screen flex items-center justify-center px-6 py-16"
         >
           <div className="container mx-auto px-4">
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-8 text-white text-center">画廊</h2>
+            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-8 text-white text-center">申请白名单</h2>
             
             <div className="max-w-6xl mx-auto">
               {/* 黑名单区域 */}
@@ -1482,9 +1482,8 @@ export default function HomePage() {
               
               {/* 白名单申请 */}
               <div className="bg-gray-900/70 p-4 md:p-6 rounded-xl border border-gray-700 mb-8">
-                <h3 className="text-xl md:text-2xl font-bold mb-4 text-white text-center">申请白名单</h3>
                 <p className="text-base md:text-lg text-gray-300 mb-4 md:mb-6 text-center">
-                  为了维护纯净的游戏环境，我们采用白名单制度。申请通过后即可加入服务器，与数百位玩家一起创造属于你们的 Minecraft 世界。
+                  为了维护纯净的游戏环境，我们采用白名单制度。申请通过后即可加入服务器，与各位玩家一起创造属于你们的 Minecraft 世界。
                 </p>
                 
                 <div className="bg-gray-800/50 p-4 md:p-6 rounded-lg border border-gray-700 mb-6">

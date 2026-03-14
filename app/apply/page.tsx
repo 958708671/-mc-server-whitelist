@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { questionCategories, serverRuleQuestions } from '@/data/questions';
 import type { Question, QuestionCategory } from '@/data/questions';
@@ -10,7 +10,7 @@ interface QuizQuestion extends Question {
   categoryName: string;
 }
 
-export default function ApplyPage() {
+function ApplyPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const skipQuiz = searchParams.get('skipQuiz') === 'true';
@@ -1048,5 +1048,17 @@ export default function ApplyPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ApplyPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 flex items-center justify-center">
+        <div className="text-white text-xl">加载中...</div>
+      </div>
+    }>
+      <ApplyPageContent />
+    </Suspense>
   );
 }
