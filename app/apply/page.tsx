@@ -28,6 +28,7 @@ export default function ApplyPage() {
   const [submitMessage, setSubmitMessage] = useState('');
   const [newBannedServer, setNewBannedServer] = useState('');
   const [showAnswers, setShowAnswers] = useState(false);
+  const [hasBeenBanned, setHasBeenBanned] = useState(false);
   
   const [formData, setFormData] = useState({
     minecraftId: '',
@@ -45,6 +46,11 @@ export default function ApplyPage() {
     if (skipQuiz) {
       setQuizPassed(true);
       setCurrentStep(2);
+      // 自动填写擅长类型为所有选项
+      setFormData(prev => ({
+        ...prev,
+        skillType: ['建筑', '生存', '养老', '红石', '指令', 'PVP战斗', '探险', '下界', '末地', '酿造', '附魔', '钓鱼', '交易', '农业与养殖', '矿物与挖矿']
+      }));
     }
   }, [skipQuiz]);
 
@@ -821,15 +827,24 @@ export default function ApplyPage() {
 
                 <div>
                   <label className="block text-gray-300 mb-2">身份/职业 *</label>
-                  <input
-                    type="text"
+                  <select
                     name="occupation"
                     value={formData.occupation}
                     onChange={handleChange}
                     required
                     className="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white focus:border-blue-500 focus:outline-none"
-                    placeholder="学生/工作等"
-                  />
+                  >
+                    <option value="">请选择</option>
+                    <option value="小学">小学</option>
+                    <option value="初中">初中</option>
+                    <option value="高中">高中</option>
+                    <option value="中专">中专</option>
+                    <option value="大专">大专</option>
+                    <option value="大学">大学</option>
+                    <option value="硕士">硕士</option>
+                    <option value="博士">博士</option>
+                    <option value="工作">工作</option>
+                  </select>
                 </div>
 
                 <div>
@@ -865,75 +880,107 @@ export default function ApplyPage() {
               </div>
 
               <div>
-                <label className="block text-gray-300 mb-2">如何知道我们的 *</label>
-                <input
-                  type="text"
-                  name="howFound"
-                  value={formData.howFound}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white focus:border-blue-500 focus:outline-none"
-                  placeholder="朋友推荐/论坛/视频等"
-                />
-              </div>
-
-              <div>
-                <label className="block text-gray-300 mb-2">擅长类型</label>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {['建筑', '生存', '养老', '红石', '指令', 'PVP战斗', '探险', '下界', '末地', '酿造', '附魔', '钓鱼', '交易', '农业与养殖', '矿物与挖矿'].map((skill) => {
-                    const isSelected = formData.skillType.includes(skill);
-                    return (
-                      <label key={skill} className="flex items-center space-x-2 p-3 bg-gray-900 border border-gray-700 rounded-lg">
-                        <input
-                          type="checkbox"
-                          name="skillType"
-                          value={skill}
-                          checked={isSelected}
-                          disabled
-                          className="w-4 h-4 text-green-500 bg-gray-800 border-gray-600 rounded"
-                        />
-                        <span className={`text-sm ${isSelected ? 'text-green-400' : 'text-gray-400'}`}>{skill}</span>
-                      </label>
-                    );
-                  })}
+                  <label className="block text-gray-300 mb-2">如何知道我们的 *</label>
+                  <input
+                    type="text"
+                    name="howFound"
+                    value={formData.howFound}
+                    onChange={handleChange}
+                    required
+                    className="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white focus:border-blue-500 focus:outline-none"
+                    placeholder="朋友推荐/论坛/视频等"
+                  />
                 </div>
+
+                <div>
+                  <label className="block text-gray-300 mb-2">擅长类型</label>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {['建筑', '生存', '养老', '红石', '指令', 'PVP战斗', '探险', '下界', '末地', '酿造', '附魔', '钓鱼', '交易', '农业与养殖', '矿物与挖矿'].map((skill) => {
+                      const isSelected = formData.skillType.includes(skill);
+                      return (
+                        <label key={skill} className="flex items-center space-x-2 p-3 bg-gray-900 border border-gray-700 rounded-lg">
+                          <input
+                            type="checkbox"
+                            name="skillType"
+                            value={skill}
+                            checked={isSelected}
+                            disabled
+                            className="w-4 h-4 text-green-500 bg-gray-800 border-gray-600 rounded"
+                          />
+                          <span className={`text-sm ${isSelected ? 'text-green-400' : 'text-gray-400'}`}>{skill}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
                 <p className="mt-1 text-sm text-gray-500">根据您选择的题库自动生成，无需手动选择。</p>
               </div>
 
               <div>
-                <label className="block text-gray-300 mb-2">被ban过的服务器</label>
-                <div className="flex gap-2 mb-2">
-                  <input
-                    type="text"
-                    value={newBannedServer}
-                    onChange={(e) => setNewBannedServer(e.target.value)}
-                    className="flex-1 px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white focus:border-blue-500 focus:outline-none"
-                    placeholder="输入服务器名称"
-                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addBannedServer())}
-                  />
-                  <button
-                    type="button"
-                    onClick={addBannedServer}
-                    className="px-4 py-3 bg-gray-600 hover:bg-gray-500 text-white rounded-lg transition-all"
-                  >
-                    添加
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {formData.bannedServers.map((server, idx) => (
-                    <span key={idx} className="px-3 py-1 bg-red-500/20 text-red-400 rounded-full text-sm flex items-center gap-2">
-                      {server}
-                      <button
-                        type="button"
-                        onClick={() => removeBannedServer(idx)}
-                        className="text-red-400 hover:text-red-300"
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
+                <label className="block text-gray-300 mb-2">是否被其他服务器ban过 *</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      name="hasBeenBanned"
+                      value="true"
+                      checked={hasBeenBanned === true}
+                      onChange={() => setHasBeenBanned(true)}
+                      required
+                      className="w-4 h-4 text-blue-500 bg-gray-800 border-gray-600 focus:ring-blue-500"
+                    />
+                    <span className="text-gray-300">是</span>
+                  </label>
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      name="hasBeenBanned"
+                      value="false"
+                      checked={hasBeenBanned === false}
+                      onChange={() => setHasBeenBanned(false)}
+                      required
+                      className="w-4 h-4 text-blue-500 bg-gray-800 border-gray-600 focus:ring-blue-500"
+                    />
+                    <span className="text-gray-300">否</span>
+                  </label>
                 </div>
               </div>
+
+              {hasBeenBanned && (
+                <div>
+                  <label className="block text-gray-300 mb-2">被ban过的服务器</label>
+                  <div className="flex gap-2 mb-2">
+                    <input
+                      type="text"
+                      value={newBannedServer}
+                      onChange={(e) => setNewBannedServer(e.target.value)}
+                      className="flex-1 px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white focus:border-blue-500 focus:outline-none"
+                      placeholder="输入服务器名称"
+                      onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addBannedServer())}
+                    />
+                    <button
+                      type="button"
+                      onClick={addBannedServer}
+                      className="px-4 py-3 bg-gray-600 hover:bg-gray-500 text-white rounded-lg transition-all"
+                    >
+                      添加
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {formData.bannedServers.map((server, idx) => (
+                      <span key={idx} className="px-3 py-1 bg-red-500/20 text-red-400 rounded-full text-sm flex items-center gap-2">
+                        {server}
+                        <button
+                          type="button"
+                          onClick={() => removeBannedServer(idx)}
+                          className="text-red-400 hover:text-red-300"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {submitMessage && (
                 <div className={`p-4 rounded-lg ${
