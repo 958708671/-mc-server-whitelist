@@ -34,6 +34,7 @@ export default function ApplyPage() {
     minecraftId: '',
     contact: '',
     age: '',
+    gender: '',
     occupation: '',
     playTime: '',
     playTimeSlot: '',
@@ -785,8 +786,9 @@ export default function ApplyPage() {
             
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Minecraft ID - 用于服务器白名单识别 */}
                 <div>
-                  <label className="block text-gray-300 mb-2">Minecraft ID *</label>
+                  <label className="block text-gray-300 mb-2">Minecraft ID <span className="text-red-500">*</span></label>
                   <input
                     type="text"
                     name="minecraftId"
@@ -796,10 +798,12 @@ export default function ApplyPage() {
                     className="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white focus:border-blue-500 focus:outline-none"
                     placeholder="您的游戏ID"
                   />
+                  <p className="mt-1 text-xs text-gray-500">您的游戏ID，加入服务器白名单时使用</p>
                 </div>
 
+                {/* QQ号 - 用于绑定游戏ID，一人一号不可重复 */}
                 <div>
-                  <label className="block text-gray-300 mb-2">QQ号 *</label>
+                  <label className="block text-gray-300 mb-2">QQ号 <span className="text-red-500">*</span></label>
                   <input
                     type="text"
                     name="contact"
@@ -809,10 +813,12 @@ export default function ApplyPage() {
                     className="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white focus:border-blue-500 focus:outline-none"
                     placeholder="用于联系"
                   />
+                  <p className="mt-1 text-xs text-gray-500">绑定游戏账号，每位玩家仅限一个QQ号</p>
                 </div>
 
+                {/* 年龄 - 了解玩家年龄段 */}
                 <div>
-                  <label className="block text-gray-300 mb-2">年龄 *</label>
+                  <label className="block text-gray-300 mb-2">年龄 <span className="text-red-500">*</span></label>
                   <input
                     type="number"
                     name="age"
@@ -823,10 +829,12 @@ export default function ApplyPage() {
                     max="80"
                     className="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white focus:border-blue-500 focus:outline-none"
                   />
+                  <p className="mt-1 text-xs text-gray-500">帮助我们了解玩家群体年龄分布</p>
                 </div>
 
+                {/* 身份/职业 - 了解玩家背景 */}
                 <div>
-                  <label className="block text-gray-300 mb-2">身份/职业 *</label>
+                  <label className="block text-gray-300 mb-2">身份/职业 <span className="text-red-500">*</span></label>
                   <select
                     name="occupation"
                     value={formData.occupation}
@@ -845,10 +853,29 @@ export default function ApplyPage() {
                     <option value="博士">博士</option>
                     <option value="工作">工作</option>
                   </select>
+                  <p className="mt-1 text-xs text-gray-500">了解玩家的学习或工作背景</p>
                 </div>
 
+                {/* 性别 - 服务器人口统计 */}
                 <div>
-                  <label className="block text-gray-300 mb-2">游戏时长(月) *</label>
+                  <label className="block text-gray-300 mb-2">性别 <span className="text-red-500">*</span></label>
+                  <select
+                    name="gender"
+                    value={formData.gender}
+                    onChange={handleChange}
+                    required
+                    className="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white focus:border-blue-500 focus:outline-none"
+                  >
+                    <option value="">请选择</option>
+                    <option value="男">男</option>
+                    <option value="女">女</option>
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">用于服务器人口统计分析</p>
+                </div>
+
+                {/* 游戏时长 - 了解玩家经验水平 */}
+                <div>
+                  <label className="block text-gray-300 mb-2">游戏时长(月) <span className="text-red-500">*</span></label>
                   <input
                     type="number"
                     name="playTime"
@@ -858,10 +885,12 @@ export default function ApplyPage() {
                     min="0"
                     className="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white focus:border-blue-500 focus:outline-none"
                   />
+                  <p className="mt-1 text-xs text-gray-500">您玩Minecraft的总时长（月）</p>
                 </div>
 
+                {/* 游玩时段 - 了解玩家活跃时间 */}
                 <div>
-                  <label className="block text-gray-300 mb-2">游玩时段 *</label>
+                  <label className="block text-gray-300 mb-2">游玩时段 <span className="text-red-500">*</span></label>
                   <select
                     name="playTimeSlot"
                     value={formData.playTimeSlot}
@@ -876,47 +905,53 @@ export default function ApplyPage() {
                     <option value="凌晨">凌晨</option>
                     <option value="不固定">不固定</option>
                   </select>
+                  <p className="mt-1 text-xs text-gray-500">您通常的游戏时间段</p>
                 </div>
               </div>
 
+              {/* 如何知道我们 - 了解推广渠道 */}
               <div>
-                  <label className="block text-gray-300 mb-2">如何知道我们的 *</label>
-                  <input
-                    type="text"
-                    name="howFound"
-                    value={formData.howFound}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white focus:border-blue-500 focus:outline-none"
-                    placeholder="朋友推荐/论坛/视频等"
-                  />
-                </div>
+                <label className="block text-gray-300 mb-2">如何知道我们的 <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  name="howFound"
+                  value={formData.howFound}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white focus:border-blue-500 focus:outline-none"
+                  placeholder="朋友推荐/论坛/视频等"
+                />
+                <p className="mt-1 text-xs text-gray-500">帮助我们了解服务器的推广效果</p>
+              </div>
 
-                <div>
-                  <label className="block text-gray-300 mb-2">擅长类型</label>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {['建筑', '生存', '养老', '红石', '指令', 'PVP战斗', '探险', '下界', '末地', '酿造', '附魔', '钓鱼', '交易', '农业与养殖', '矿物与挖矿'].map((skill) => {
-                      const isSelected = formData.skillType.includes(skill);
-                      return (
-                        <label key={skill} className="flex items-center space-x-2 p-3 bg-gray-900 border border-gray-700 rounded-lg">
-                          <input
-                            type="checkbox"
-                            name="skillType"
-                            value={skill}
-                            checked={isSelected}
-                            disabled
-                            className="w-4 h-4 text-green-500 bg-gray-800 border-gray-600 rounded"
-                          />
-                          <span className={`text-sm ${isSelected ? 'text-green-400' : 'text-gray-400'}`}>{skill}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
+              {/* 擅长类型 - 根据选择题库自动生成 */}
+              <div>
+                <label className="block text-gray-300 mb-2">擅长类型</label>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {['建筑', '生存', '养老', '红石', '指令', 'PVP战斗', '探险', '下界', '末地', '酿造', '附魔', '钓鱼', '交易', '农业与养殖', '矿物与挖矿'].map((skill) => {
+                    const isSelected = formData.skillType.includes(skill);
+                    return (
+                      <label key={skill} className="flex items-center space-x-2 p-3 bg-gray-900 border border-gray-700 rounded-lg">
+                        <input
+                          type="checkbox"
+                          name="skillType"
+                          value={skill}
+                          checked={isSelected}
+                          disabled
+                          className="w-4 h-4 text-green-500 bg-gray-800 border-gray-600 rounded"
+                        />
+                        <span className={`text-sm ${isSelected ? 'text-green-400' : 'text-gray-400'}`}>{skill}</span>
+                      </label>
+                    );
+                  })}
+                </div>
                 <p className="mt-1 text-sm text-gray-500">根据您选择的题库自动生成，无需手动选择。</p>
               </div>
 
+              {/* 是否被ban - 了解玩家历史记录 */}
               <div>
-                <label className="block text-gray-300 mb-2">是否被其他服务器ban过 *</label>
+                <label className="block text-gray-300 mb-2">是否被其他服务器ban过 <span className="text-red-500">*</span></label>
+                <p className="mb-2 text-xs text-gray-500">请如实填写，不会影响审核结果</p>
                 <div className="flex gap-4">
                   <label className="flex items-center space-x-2">
                     <input
@@ -995,7 +1030,7 @@ export default function ApplyPage() {
               <div className="flex gap-4">
                 <button
                   type="button"
-                  onClick={() => setCurrentStep(1)}
+                  onClick={() => router.push('/')}
                   className="px-8 py-3 bg-gray-600 hover:bg-gray-500 text-white rounded-lg font-semibold transition-all"
                 >
                   返回

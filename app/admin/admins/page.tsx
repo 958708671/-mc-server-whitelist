@@ -607,7 +607,7 @@ export default function AdminsPage() {
             
             <div className="space-y-4">
               <div>
-                <label className="block text-gray-300 text-sm mb-2 font-medium">用户名 *</label>
+                <label className="block text-gray-300 text-sm mb-2 font-medium">用户名 <span className="text-red-500">*</span></label>
                 <input
                   type="text"
                   value={formData.username}

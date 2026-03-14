@@ -464,7 +464,7 @@ export default function EventsPage() {
             
             <div className="space-y-4">
               <div>
-                <label className="block text-gray-300 text-sm mb-2 font-medium">标题 *</label>
+                <label className="block text-gray-300 text-sm mb-2 font-medium">标题 <span className="text-red-500">*</span></label>
                 <input
                   type="text"
                   value={formData.title}
