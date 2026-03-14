@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { questionCategories, serverRuleQuestions } from '@/data/questions';
 import type { Question, QuestionCategory } from '@/data/questions';
 
@@ -12,6 +12,9 @@ interface QuizQuestion extends Question {
 
 export default function ApplyPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const skipQuiz = searchParams.get('skipQuiz') === 'true';
+  
   const [currentStep, setCurrentStep] = useState(0);
   const [selectedCategories, setSelectedCategories] = useState<Record<string, number>>({});
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
@@ -37,6 +40,13 @@ export default function ApplyPage() {
     skillType: [] as string[],
     bannedServers: [] as string[]
   });
+
+  useEffect(() => {
+    if (skipQuiz) {
+      setQuizPassed(true);
+      setCurrentStep(2);
+    }
+  }, [skipQuiz]);
 
   // 固定题目数量
   const TOTAL_QUESTIONS = 30;
