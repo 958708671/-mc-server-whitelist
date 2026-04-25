@@ -31,7 +31,10 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files (can opt-in for committing if needed)
-.env*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
 # vercel
 .vercel
@@ -39,3 +42,24 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Mock database files (local only)
+lib/mock-db.ts
+lib/db-sync.ts
+app/api/dev/mock-db/route.ts
+app/api/sync/route.ts
+components/SyncMonitor.tsx
+components/OfflineStatusBar.tsx
+
+# Mock database data directory
+data/
+
+# Environment files
+.vercel
+.env*.local
+
+# Local development directory
+local-dev/
+
+# Backup directory
+backup/
