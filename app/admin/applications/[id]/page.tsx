@@ -95,7 +95,8 @@ export default function ApplicationDetailPage() {
     }
   };
 
-  const getPlayTimeText = (playTime: number | string) => {
+  const getPlayTimeText = (playTime: number | string | null) => {
+    if (playTime === null) return '未填写';
     if (typeof playTime === 'number') {
       if (playTime === 0) return '新手（1年以内）';
       if (playTime === 1) return '熟练（1-3年）';

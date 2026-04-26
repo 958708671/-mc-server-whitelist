@@ -10,8 +10,8 @@ async function getTransporter() {
     const nodemailer = await import('nodemailer');
     transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'smtp.qq.com',
-      port: parseInt(process.env.SMTP_PORT || '465'),
-      secure: true,
+      port: parseInt(process.env.SMTP_PORT || '587'),
+      secure: parseInt(process.env.SMTP_PORT || '587') === 465,
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
@@ -251,7 +251,7 @@ export async function POST(request: NextRequest) {
         await mailer.sendMail({
           from: `"云顶之境白名单系统" <${process.env.EMAIL_USER}>`,
           to: testEmail,
-          subject: `📝 新的白名单申请 - ${safeValues.minecraft_id}`,
+          subject: `📝 新的白名单申请 - ${encodeURIComponent(safeValues.minecraft_id)}`,
           html: mailContent,
         });
         console.log('邮件发送成功：', testEmail);

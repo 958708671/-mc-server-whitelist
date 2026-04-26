@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { neon } from '@neondatabase/serverless';
+import sql from '@/lib/db';
 import { requireOwner } from '@/lib/auth';
 import bcrypt from 'bcryptjs';
-
-const sql = neon(process.env.DATABASE_URL || '');
 
 // 初始密码从环境变量读取，不在源码中硬编码
 // 在 Vercel Dashboard / .env.local 中配置：

@@ -1,21 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-interface FormData {
-  minecraftId: string;
-  age: string;
-  gender: string;
-  contact: string;
-  howFound: string;
-  playTime: string;
-  playTimeSlot: string;
-  skillType: string[];
-  occupation: string;
-}
-
-export default function ApplicationForm() {
+// 内部组件，使用useSearchParams
+function ApplicationFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -23,6 +12,18 @@ export default function ApplicationForm() {
   const quizTotal = searchParams.get('total') || '100';
   const quizCategories = searchParams.get('categories') || '';
   const selectedCategories = searchParams.get('selected') || '';
+
+  interface FormData {
+    minecraftId: string;
+    age: string;
+    gender: string;
+    contact: string;
+    howFound: string;
+    playTime: string;
+    playTimeSlot: string;
+    skillType: string[];
+    occupation: string;
+  }
 
   const [isValid, setIsValid] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
@@ -376,7 +377,8 @@ export default function ApplicationForm() {
         <div className="bg-gray-800/50 rounded-2xl p-8 border border-gray-700">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* 第一行：4列网格布局 */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 <div>
                   <label className="block text-gray-300 mb-2">Minecraft ID <span className="text-red-500">*</span></label>
                   <input
@@ -388,7 +390,7 @@ export default function ApplicationForm() {
                     className="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white focus:border-blue-500 focus:outline-none"
                     placeholder="请输入你的Minecraft游戏ID"
                   />
-                  <p className="mt-1 text-xs text-gray-500">请确保ID准确无误，这将是你在服务器中的名字</p>
+                  <p className="mt-1 text-xs text-gray-500">请确保ID准确无误</p>
                 </div>
                 
                 <div>
@@ -406,9 +408,7 @@ export default function ApplicationForm() {
                   />
                   <p className="mt-1 text-xs text-gray-500">服务器要求年龄10岁以上</p>
                 </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
                 <div>
                   <label className="block text-gray-300 mb-2">性别 <span className="text-red-500">*</span></label>
                   <select
@@ -422,7 +422,7 @@ export default function ApplicationForm() {
                     <option value="男">男</option>
                     <option value="女">女</option>
                   </select>
-                  <p className="mt-1 text-xs text-gray-500">用于服务器人口统计分析</p>
+                  <p className="mt-1 text-xs text-gray-500">用于人口统计分析</p>
                 </div>
                 
                 <div>
@@ -440,7 +440,8 @@ export default function ApplicationForm() {
                 </div>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* 第二行：4列网格布局 */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 <div>
                   <label className="block text-gray-300 mb-2">身份/职业 <span className="text-red-500">*</span></label>
                   <select
@@ -461,7 +462,7 @@ export default function ApplicationForm() {
                     <option value="博士">博士</option>
                     <option value="工作">工作</option>
                   </select>
-                  <p className="mt-1 text-xs text-gray-500">了解玩家的学习或工作背景</p>
+                  <p className="mt-1 text-xs text-gray-500">了解你的学习或工作背景</p>
                 </div>
                 
                 <div>
@@ -475,11 +476,9 @@ export default function ApplicationForm() {
                     className="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white focus:border-blue-500 focus:outline-none"
                     placeholder="朋友推荐/论坛/视频等"
                   />
-                  <p className="mt-1 text-xs text-gray-500">帮助我们了解服务器的宣传效果</p>
+                  <p className="mt-1 text-xs text-gray-500">帮助我们了解宣传效果</p>
                 </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
                 <div>
                   <label className="block text-gray-300 mb-2">游戏时长 <span className="text-red-500">*</span></label>
                   <select
@@ -495,7 +494,7 @@ export default function ApplicationForm() {
                     <option value="老手（3-5年）">老手（3-5年）</option>
                     <option value="专家（5年以上）">专家（5年以上）</option>
                   </select>
-                  <p className="mt-1 text-xs text-gray-500">了解玩家的游戏经验水平</p>
+                  <p className="mt-1 text-xs text-gray-500">了解你的游戏经验水平</p>
                 </div>
                 
                 <div>
@@ -514,11 +513,12 @@ export default function ApplicationForm() {
                     <option value="凌晨（0:00-6:00）">凌晨（0:00-6:00）</option>
                     <option value="不确定">不确定</option>
                   </select>
-                  <p className="mt-1 text-xs text-gray-500">了解玩家的游戏时间分布</p>
+                  <p className="mt-1 text-xs text-gray-500">了解你的游戏时间分布</p>
                 </div>
               </div>
             </div>
 
+            {/* 擅长领域：单独成行显示 */}
             <div>
               <label className="block text-gray-300 mb-2">擅长领域</label>
               <div className="flex flex-wrap gap-2">
@@ -625,5 +625,14 @@ export default function ApplicationForm() {
         </div>
       </div>
     </div>
+  );
+}
+
+// 主组件，使用Suspense包装
+export default function ApplicationForm() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 p-4 flex items-center justify-center"><div className="text-white text-xl">加载中...</div></div>}>
+      <ApplicationFormContent />
+    </Suspense>
   );
 }

@@ -32,7 +32,11 @@ export interface Application {
   // IP地址
   ip_address?: string;
   // 作品相关
-  work_files?: string[]; // 作品图片URL数组
+  work_files?: {
+    photos: string[];
+    video: string | null;
+    archive: string | null;
+  }; // 作品文件信息
   scenario_answers?: Record<number, string>; // 实景题答案
 }
 

@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { neon } from '@neondatabase/serverless';
-import { requireAuth } from '@/lib/auth';
-
-const sql = neon(process.env.DATABASE_URL || '');
+import sql from '@/lib/db';
+import { requireOwner, requireAuth } from '@/lib/auth';
 
 // 允许写入的 key 白名单，防止任意 key 注入系统设置表
 const ALLOWED_KEYS = new Set([
@@ -19,7 +17,7 @@ export async function GET() {
     `;
     
     const settingsMap: Record<string, string> = {};
-    settings.forEach((s) => {
+    settings.forEach((s: any) => {
       settingsMap[s.setting_key] = s.setting_value;
     });
     

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { join } from 'path';
-import { existsSync, readFile } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import sql, { withRetry } from '@/lib/db';
 import { initFileMetadataTable } from '@/lib/fileMetadata';
 
@@ -18,9 +18,9 @@ function getClientIP(request: NextRequest): string {
   return 'unknown';
 }
 
-export async function GET(request: NextRequest, { params }: { params: { filename: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ filename: string }> }) {
   try {
-    const { filename } = params;
+    const { filename } = await params;
     const clientIP = getClientIP(request);
     
     // 确保文件元数据表存在
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest, { params }: { params: { filename
     });
     
     // 读取文件内容
-    const fileContent = await readFile(filePath);
+    const fileContent = readFileSync(filePath);
     
     // 根据文件扩展名设置Content-Type
     const ext = filename.split('.').pop()?.toLowerCase() || '';

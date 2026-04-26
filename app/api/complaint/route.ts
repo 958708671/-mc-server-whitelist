@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { neon } from '@neondatabase/serverless';
+import sql from '@/lib/db';
 
 // 动态导入nodemailer
 let transporter: any;
@@ -19,9 +19,6 @@ async function getTransporter() {
   }
   return transporter;
 }
-
-// 初始化数据库连接
-const sql = neon(process.env.DATABASE_URL || '');
 
 export async function POST(request: NextRequest) {
   try {

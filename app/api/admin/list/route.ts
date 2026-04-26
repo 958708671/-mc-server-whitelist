@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     });
     
     // 解析 permissions JSONB 字段
-    const formattedAdmins = admins.map(admin => ({
+    const formattedAdmins = admins.map((admin: any) => ({
       ...admin,
       permissions: admin.permissions || {
         whitelist_review: true,

@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { neon } from '@neondatabase/serverless';
+import sql from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
-
-const sql = neon(process.env.DATABASE_URL || '');
 
 const getClientIP = (request: NextRequest): string => {
   const forwarded = request.headers.get('x-forwarded-for');

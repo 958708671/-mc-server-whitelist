@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { neon } from '@neondatabase/serverless';
+import sql from '@/lib/db';
 import { requireOwner, requireAuth } from '@/lib/auth';
 import bcrypt from 'bcryptjs';
-
-const sql = neon(process.env.DATABASE_URL || '');
 
 export async function POST(request: NextRequest) {
   // 添加管理员需要服主权限
