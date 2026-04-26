@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { questionCategories, serverRuleQuestions } from '@/data/questions';
+import Image from 'next/image';
+import { questionCategories } from '@/data/questions';
 import type { Question, QuestionCategory } from '@/data/questions';
 
 interface QuizQuestion extends Question {
@@ -14,10 +15,16 @@ function ApplyPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const skipQuiz = searchParams.get('skipQuiz') === 'true';
+  const processedResultIndexRef = useRef<Record<number, number>>({});
+  const currentQuestionIndexRef = useRef<number>(0);
+  const recognitionRef = useRef<any>(null);
   
   const [currentStep, setCurrentStep] = useState(0);
   const [selectedCategories, setSelectedCategories] = useState<Record<string, number>>({});
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
+  const [quizAttemptsRemaining, setQuizAttemptsRemaining] = useState<number>(3);
+  const [isAdminUser, setIsAdminUser] = useState(false);
+  const [isLimited, setIsLimited] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [userAnswers, setUserAnswers] = useState<Record<number, number[]>>({});
   const [showResult, setShowResult] = useState(false);
@@ -29,6 +36,16 @@ function ApplyPageContent() {
   const [newBannedServer, setNewBannedServer] = useState('');
   const [showAnswers, setShowAnswers] = useState(false);
   const [hasBeenBanned, setHasBeenBanned] = useState(false);
+  const [showStartModal, setShowStartModal] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [scenarioTextAnswers, setScenarioTextAnswers] = useState<Record<number, string>>({});
+  const [isRecording, setIsRecording] = useState(false);
+  const [photoFiles, setPhotoFiles] = useState<File[]>([]);
+  const [photoPreviewUrls, setPhotoPreviewUrls] = useState<string[]>([]);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string>('');
+  const [archiveFile, setArchiveFile] = useState<File | null>(null);
+  const [archivePreviewUrl, setArchivePreviewUrl] = useState<string>('');
   
   const [formData, setFormData] = useState({
     minecraftId: '',
@@ -47,20 +64,80 @@ function ApplyPageContent() {
     if (skipQuiz) {
       setQuizPassed(true);
       setCurrentStep(2);
-      // 自动填写擅长类型为所有选项
       setFormData(prev => ({
         ...prev,
-        skillType: ['建筑', '生存', '养老', '红石', '指令', 'PVP战斗', '探险', '下界', '末地', '酿造', '附魔', '钓鱼', '交易', '农业与养殖', '矿物与挖矿']
+        skillType: ['建筑', '生存', '指令', '生电', '附魔与酿造']
       }));
     }
   }, [skipQuiz]);
 
-  // 固定题目数量
-  const TOTAL_QUESTIONS = 30;
-  const SINGLE_CHOICE_COUNT = 15;
-  const MULTIPLE_CHOICE_COUNT = 10;
-  const JUDGMENT_COUNT = 5;
-  const REQUIRED_QUESTIONS_COUNT = 5;
+  // 检查答题次数和管理员状态
+  useEffect(() => {
+    async function checkQuizAttempts() {
+      try {
+        // 检查是否是管理员
+        const adminRes = await fetch('/api/admin/status');
+        const adminData = await adminRes.json();
+        setIsAdminUser(adminData.isAdmin);
+
+        // 如果是管理员，不限制答题次数
+        if (adminData.isAdmin) {
+          setIsLimited(false);
+          setQuizAttemptsRemaining(-1); // 无限次
+          return;
+        }
+
+        // 检查答题次数
+        const attemptsRes = await fetch('/api/quiz-attempts');
+        const attemptsData = await attemptsRes.json();
+
+        if (attemptsData.success) {
+          setQuizAttemptsRemaining(attemptsData.remaining);
+          setIsLimited(attemptsData.remaining <= 0);
+        }
+      } catch (error) {
+        console.error('检查答题次数失败:', error);
+      }
+    }
+
+    checkQuizAttempts();
+  }, []);
+
+  // 当返回选择题库时，重新检查答题次数
+  useEffect(() => {
+    if (currentStep === 0 && !skipQuiz) {
+      // 返回选择题库时，重新获取最新的答题次数
+      async function refreshAttempts() {
+        try {
+          if (isAdminUser) return;
+
+          const attemptsRes = await fetch('/api/quiz-attempts');
+          const attemptsData = await attemptsRes.json();
+          if (attemptsData.success) {
+            setQuizAttemptsRemaining(attemptsData.remaining);
+            setIsLimited(attemptsData.remaining <= 0);
+          }
+        } catch (error) {
+          console.error('刷新答题次数失败:', error);
+        }
+      }
+
+      refreshAttempts();
+    }
+  }, [currentStep, skipQuiz, isAdminUser]);
+
+  // 根据是否选择建筑或生电决定题目数量
+  const isSpecialCategory = Object.keys(selectedCategories).some(id => 
+    id === 'building' || id === 'redstone'
+  );
+  const QUESTION_COUNT = isSpecialCategory ? 15 : 30;
+  
+  // 15道题：单选8×5=40，多选4×10=40，判断2×5=10，实景1×0=0，共100分
+  // 30道题：单选18×3=54，多选6×5=30，判断4×3=12，实景2×0=0，共100分
+  const SINGLE_CHOICE_COUNT = isSpecialCategory ? 8 : 18;
+  const MULTIPLE_CHOICE_COUNT = isSpecialCategory ? 4 : 6;
+  const JUDGMENT_COUNT = isSpecialCategory ? 2 : 4;
+  const SCENARIO_COUNT = isSpecialCategory ? 1 : 2;
 
   const handleCategoryToggle = (categoryId: string) => {
     setSelectedCategories(prev => {
@@ -123,7 +200,7 @@ function ApplyPageContent() {
     return labels[value] || '入门';
   };
 
-  const generateQuiz = () => {
+  const startQuiz = () => {
     const categoryIds = Object.keys(selectedCategories);
     if (categoryIds.length === 0) return;
     if (categoryIds.length > 5) {
@@ -131,22 +208,10 @@ function ApplyPageContent() {
       return;
     }
 
-    // 收集所有可用题目
     const allSingleQuestions: QuizQuestion[] = [];
     const allMultipleQuestions: QuizQuestion[] = [];
     const allJudgmentQuestions: QuizQuestion[] = [];
-
-    // 从服务器规则中添加题目
-    serverRuleQuestions.forEach(q => {
-      const quizQ: QuizQuestion = {
-        ...q,
-        categoryId: 'rules',
-        categoryName: '服务器规则'
-      };
-      if (q.type === 'single') allSingleQuestions.push(quizQ);
-      else if (q.type === 'multiple') allMultipleQuestions.push(quizQ);
-      else if (q.type === 'judgment') allJudgmentQuestions.push(quizQ);
-    });
+    const allScenarioQuestions: QuizQuestion[] = [];
 
     // 从选择的分类中添加题目
     categoryIds.forEach(categoryId => {
@@ -162,93 +227,53 @@ function ApplyPageContent() {
         if (q.type === 'single') allSingleQuestions.push(quizQ);
         else if (q.type === 'multiple') allMultipleQuestions.push(quizQ);
         else if (q.type === 'judgment') allJudgmentQuestions.push(quizQ);
+        else if (q.type === 'scenario') allScenarioQuestions.push(quizQ);
       });
     });
 
-    // 随机选择必选题（每类1-2道，共5道）
-    const selectedQuestions: QuizQuestion[] = [];
-    const requiredQuestionIds: Set<string> = new Set();
+    // 打乱题库
+    const shuffle = <T,>(arr: T[]): T[] => [...arr].sort(() => Math.random() - 0.5);
+    
+    // 抽取题目
+    const selectedSingle = shuffle(allSingleQuestions).slice(0, SINGLE_CHOICE_COUNT);
+    const selectedMultiple = shuffle(allMultipleQuestions).slice(0, MULTIPLE_CHOICE_COUNT);
+    const selectedJudgment = shuffle(allJudgmentQuestions).slice(0, JUDGMENT_COUNT);
+    const selectedScenario = shuffle(allScenarioQuestions).slice(0, SCENARIO_COUNT);
 
-    // 单选必选题：1-2道
-    const singleRequiredCount = Math.floor(Math.random() * 2) + 1;
-    const shuffledSingle = [...allSingleQuestions].sort(() => Math.random() - 0.5);
-    for (let i = 0; i < singleRequiredCount && i < shuffledSingle.length; i++) {
-      const q = { ...shuffledSingle[i], required: true };
-      selectedQuestions.push(q);
-      requiredQuestionIds.add(`${q.categoryId}-${q.id}`);
-    }
-
-    // 多选必选题：1-2道
-    const multipleRequiredCount = Math.floor(Math.random() * 2) + 1;
-    const shuffledMultiple = [...allMultipleQuestions].sort(() => Math.random() - 0.5);
-    let multipleRequiredAdded = 0;
-    for (const q of shuffledMultiple) {
-      if (multipleRequiredAdded >= multipleRequiredCount) break;
-      const key = `${q.categoryId}-${q.id}`;
-      if (!requiredQuestionIds.has(key)) {
-        selectedQuestions.push({ ...q, required: true });
-        requiredQuestionIds.add(key);
-        multipleRequiredAdded++;
-      }
-    }
-
-    // 判断必选题：1-2道（确保总共5道）
-    const judgmentRequiredCount = REQUIRED_QUESTIONS_COUNT - singleRequiredCount - multipleRequiredCount;
-    const shuffledJudgment = [...allJudgmentQuestions].sort(() => Math.random() - 0.5);
-    let judgmentRequiredAdded = 0;
-    for (const q of shuffledJudgment) {
-      if (judgmentRequiredAdded >= judgmentRequiredCount) break;
-      const key = `${q.categoryId}-${q.id}`;
-      if (!requiredQuestionIds.has(key)) {
-        selectedQuestions.push({ ...q, required: true });
-        requiredQuestionIds.add(key);
-        judgmentRequiredAdded++;
-      }
-    }
-
-    // 补充普通题目到指定数量
-    const remainingSingle = SINGLE_CHOICE_COUNT - singleRequiredCount;
-    const remainingMultiple = MULTIPLE_CHOICE_COUNT - multipleRequiredCount;
-    const remainingJudgment = JUDGMENT_COUNT - judgmentRequiredCount;
-
-    // 添加单选题
-    const normalSingle = shuffledSingle.filter(q => !requiredQuestionIds.has(`${q.categoryId}-${q.id}`));
-    for (let i = 0; i < remainingSingle && i < normalSingle.length; i++) {
-      selectedQuestions.push({ ...normalSingle[i], required: false });
-    }
-
-    // 添加多选题
-    const normalMultiple = shuffledMultiple.filter(q => !requiredQuestionIds.has(`${q.categoryId}-${q.id}`));
-    for (let i = 0; i < remainingMultiple && i < normalMultiple.length; i++) {
-      selectedQuestions.push({ ...normalMultiple[i], required: false });
-    }
-
-    // 添加判断题
-    const normalJudgment = shuffledJudgment.filter(q => !requiredQuestionIds.has(`${q.categoryId}-${q.id}`));
-    for (let i = 0; i < remainingJudgment && i < normalJudgment.length; i++) {
-      selectedQuestions.push({ ...normalJudgment[i], required: false });
-    }
-
-    // 按题型分类并打乱顺序
-    const singleQuestions = selectedQuestions.filter(q => q.type === 'single').sort(() => Math.random() - 0.5);
-    const multipleQuestions = selectedQuestions.filter(q => q.type === 'multiple').sort(() => Math.random() - 0.5);
-    const judgmentQuestions = selectedQuestions.filter(q => q.type === 'judgment').sort(() => Math.random() - 0.5);
-
-    // 最终题目顺序：单选 -> 多选 -> 判断
+    // 最终题目顺序：单选 -> 多选 -> 判断 -> 实景
     const finalQuestions = [
-      ...singleQuestions.slice(0, SINGLE_CHOICE_COUNT),
-      ...multipleQuestions.slice(0, MULTIPLE_CHOICE_COUNT),
-      ...judgmentQuestions.slice(0, JUDGMENT_COUNT)
+      ...selectedSingle,
+      ...selectedMultiple,
+      ...selectedJudgment,
+      ...selectedScenario
     ];
 
     setQuizQuestions(finalQuestions);
     setCurrentStep(1);
     setCurrentQuestionIndex(0);
     setUserAnswers({});
+    setScenarioTextAnswers({});
     setShowResult(false);
     setShowQuestionNav(false);
-    setFailedRequired(false);
     setShowAnswers(false);
+    setShowStartModal(false);
+  };
+
+  const generateQuiz = () => {
+    const categoryIds = Object.keys(selectedCategories);
+    if (categoryIds.length === 0) return;
+    if (categoryIds.length > 5) {
+      alert('最多只能选择5个分类');
+      return;
+    }
+
+    // 检查答题次数限制（非管理员）
+    if (isLimited && !isAdminUser) {
+      alert(`您今天的答题次数已用完（3/3）。\n请明天再试或联系管理员解除限制。`);
+      return;
+    }
+
+    setShowStartModal(true);
   };
 
   const handleOptionToggle = (optionIndex: number) => {
@@ -278,7 +303,16 @@ function ApplyPageContent() {
 
   const handleNextQuestion = () => {
     const currentAnswers = userAnswers[currentQuestionIndex] || [];
-    if (currentAnswers.length === 0) return;
+    const currentQuestion = quizQuestions[currentQuestionIndex];
+    
+    // 主观题检查 scenarioTextAnswers
+    if (currentQuestion?.type === 'scenario') {
+      const textAnswer = scenarioTextAnswers[currentQuestionIndex];
+      if (!textAnswer || textAnswer.trim() === '') return;
+    } else if (currentAnswers.length === 0) {
+      // 选择题检查 userAnswers
+      return;
+    }
 
     if (currentQuestionIndex < quizQuestions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
@@ -288,28 +322,7 @@ function ApplyPageContent() {
     }
   };
 
-  const checkAllAnswers = () => {
-    let wrongRequiredCount = 0;
-    let correctCount = 0;
-
-    quizQuestions.forEach((question, index) => {
-      const userAnswer = userAnswers[index] || [];
-      const correctAnswer = Array.isArray(question.correct) ? question.correct : [question.correct];
-      const isCorrect = userAnswer.length === correctAnswer.length && 
-                        userAnswer.every(a => correctAnswer.includes(a));
-      
-      if (isCorrect) {
-        correctCount++;
-      } else if (question.required) {
-        wrongRequiredCount++;
-      }
-    });
-
-    // 必选题答错则考试不通过
-    if (wrongRequiredCount > 0) {
-      setFailedRequired(true);
-    }
-
+  const checkAllAnswers = async () => {
     setShowResult(true);
     setShowAnswers(true);
   };
@@ -321,36 +334,57 @@ function ApplyPageContent() {
   };
 
   const calculateScore = () => {
-    let correct = 0;
+    let totalScore = 0;
+    let earnedScore = 0;
+    
     quizQuestions.forEach((question, index) => {
+      if (question.type === 'scenario') return;
+      
+      totalScore += question.score;
       const userAnswer = userAnswers[index] || [];
       const correctAnswer = Array.isArray(question.correct) ? question.correct : [question.correct];
       
       if (userAnswer.length === correctAnswer.length && 
           userAnswer.every(a => correctAnswer.includes(a))) {
-        correct++;
+        earnedScore += question.score;
       }
     });
-    return correct;
+    
+    return { earnedScore, totalScore, percentage: totalScore > 0 ? (earnedScore / totalScore) * 100 : 0 };
   };
 
-  const handleQuizComplete = () => {
-    const score = calculateScore();
-    const total = quizQuestions.length;
-    const passRate = score / total;
-    
-    if (passRate >= 0.85 && !failedRequired) {
+  const handleQuizComplete = async () => {
+    const { earnedScore, totalScore } = calculateScore();
+
+    if (earnedScore >= 60) {
       const selectedCategoryIds = Object.keys(selectedCategories);
       const uniqueSkillTypes = generateSkillTypes(selectedCategoryIds);
-      
+
       setFormData(prev => ({
         ...prev,
         skillType: uniqueSkillTypes
       }));
-      
+
       setQuizPassed(true);
       setCurrentStep(2);
     } else {
+      // 答题没通过，记录一次（非管理员）
+      if (!isAdminUser) {
+        try {
+          await fetch('/api/quiz-attempts', { method: 'POST' });
+
+          // 增加后重新获取最新的答题次数
+          const attemptsRes = await fetch('/api/quiz-attempts');
+          const attemptsData = await attemptsRes.json();
+          if (attemptsData.success) {
+            setQuizAttemptsRemaining(attemptsData.remaining);
+            setIsLimited(attemptsData.remaining <= 0);
+          }
+        } catch (error) {
+          console.error('增加答题次数失败:', error);
+        }
+      }
+
       setShowResult(false);
       setCurrentQuestionIndex(0);
       setUserAnswers({});
@@ -392,43 +426,99 @@ function ApplyPageContent() {
       return;
     }
 
-    // 设置最大请求时间为10秒
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('请求超时')), 10000);
-    });
+    // 如果选择了建筑或生电，校验是否上传了作品
+    if (isSpecialCategory) {
+      const hasPhotos = photoFiles.length >= 3;
+      const hasVideo = videoFile !== null;
+      const hasArchive = archiveFile !== null;
+      
+      // 至少要有存档
+      if (!hasArchive) {
+        setSubmitMessage('请上传存档文件');
+        setIsSubmitting(false);
+        return;
+      }
+      
+      // 照片至少3张或视频至少1个
+      if (!hasPhotos && !hasVideo) {
+        setSubmitMessage('照片至少3张或视频至少1个');
+        setIsSubmitting(false);
+        return;
+      }
+    }
 
     try {
-      console.log('开始发送请求');
+      const allFiles: File[] = [];
       
-      // 使用Promise.race来处理超时
-      const response = await Promise.race([
-        fetch('/api/applications', {
+      // 收集所有文件
+      photoFiles.forEach(file => allFiles.push(file));
+      if (videoFile) allFiles.push(videoFile);
+      if (archiveFile) allFiles.push(archiveFile);
+      
+      let uploadedUrls: string[] = [];
+      
+      // 如果有文件，先上传
+      if (allFiles.length > 0) {
+        console.log('开始上传作品文件');
+        const uploadFormData = new FormData();
+        allFiles.forEach(file => {
+          uploadFormData.append('files', file);
+        });
+        
+        const uploadResponse = await fetch('/api/upload', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
+          body: uploadFormData,
+        });
+        
+        const uploadData = await uploadResponse.json();
+        
+        if (!uploadData.success) {
+          throw new Error(uploadData.message || '文件上传失败');
+        }
+        
+        uploadedUrls = uploadData.urls;
+        console.log('文件上传成功:', uploadedUrls);
+      }
+
+      console.log('开始提交申请');
+      const { earnedScore, totalScore } = calculateScore();
+      
+      // 分离照片、视频、存档的URL
+      const photoUrls = uploadedUrls.slice(0, photoFiles.length);
+      const videoUrl = videoFile ? uploadedUrls[photoFiles.length] : null;
+      const archiveUrl = archiveFile ? uploadedUrls[photoFiles.length + (videoFile ? 1 : 0)] : null;
+      
+      const response = await fetch('/api/applications', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          minecraft_id: formData.minecraftId,
+          contact: formData.contact,
+          age: parseInt(formData.age),
+          gender: formData.gender,
+          how_found: formData.howFound,
+          play_time: formData.playTime,
+          play_style: formData.skillType.join(', '),
+          griefing_history: formData.bannedServers.length > 0 ? formData.bannedServers.join(', ') : '无',
+          quiz_score: earnedScore,
+          quiz_total: totalScore,
+          quiz_category: Object.keys(selectedCategories).join(', '),
+          reason: '',
+          favorite_mode: formData.playTimeSlot,
+          server_experience: '',
+          country: '',
+          discord_id: '',
+          additional_info: '',
+          work_files: {
+            photos: photoUrls,
+            video: videoUrl,
+            archive: archiveUrl
           },
-          body: JSON.stringify({
-            minecraft_id: formData.minecraftId,
-            contact: formData.contact,
-            age: parseInt(formData.age),
-            gender: formData.gender,
-            how_found: formData.howFound,
-            play_time: formData.playTime,
-            play_style: formData.skillType.join(', '),
-            griefing_history: formData.bannedServers.length > 0 ? formData.bannedServers.join(', ') : '无',
-            quiz_score: calculateScore(),
-            quiz_total: quizQuestions.length,
-            reason: '',
-            quiz_category: '',
-            favorite_mode: '',
-            server_experience: '',
-            country: '',
-            discord_id: '',
-            additional_info: ''
-          }),
+          scenario_answers: scenarioTextAnswers
         }),
-        timeoutPromise
-      ]) as Response;
+      });
 
       console.log('请求完成，状态码:', response.status);
       
@@ -450,7 +540,7 @@ function ApplyPageContent() {
       }
     } catch (error) {
       console.error('提交出错:', error);
-      setSubmitMessage('网络错误，请检查连接后重试。');
+      setSubmitMessage(error instanceof Error ? error.message : '网络错误，请检查连接后重试。');
     } finally {
       console.log('执行finally，设置isSubmitting为false');
       // 确保isSubmitting状态被重置
@@ -469,6 +559,7 @@ function ApplyPageContent() {
     setShowQuestionNav(false);
     setFailedRequired(false);
     setShowAnswers(false);
+    setIsRecording(false);
     setFormData(prev => ({
       ...prev,
       skillType: []
@@ -492,11 +583,251 @@ function ApplyPageContent() {
     }));
   };
 
+  const handleScenarioTextChange = (index: number, text: string) => {
+    setScenarioTextAnswers(prev => ({
+      ...prev,
+      [index]: text
+    }));
+  };
+
+  const handleVoiceInput = (index: number) => {
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      
+      // 如果正在录音，则停止
+      if (isRecording) {
+        (window as any).speechRecognitionInstance?.stop();
+        setIsRecording(false);
+        return;
+      }
+      
+      // 开始新的录音
+      const recognition = new SpeechRecognition();
+      (window as any).speechRecognitionInstance = recognition;
+      recognitionRef.current = recognition;
+      currentQuestionIndexRef.current = index;
+      
+      recognition.lang = 'zh-CN';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      setIsRecording(true);
+      
+      // 保存当前的文本作为基础
+      const baseText = scenarioTextAnswers[index] || '';
+      
+      recognition.onresult = (event: any) => {
+        // 最终文本累积
+        let finalText = baseText;
+        // 临时文本（实时显示）
+        let interimText = '';
+        
+        // 遍历所有结果
+        for (let i = 0; i < event.results.length; i++) {
+          const result = event.results[i];
+          const transcript = result[0].transcript;
+          
+          if (result.isFinal) {
+            // 最终结果：检查是否已包含这段文本
+            if (!finalText.includes(transcript)) {
+              finalText += transcript;
+            }
+          } else {
+            // 临时结果：直接显示
+            interimText += transcript;
+          }
+        }
+        
+        // 显示：基础文本 + 临时文本
+        handleScenarioTextChange(index, finalText + interimText);
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error('语音识别错误:', event.error);
+        setIsRecording(false);
+        if (event.error !== 'no-speech' && event.error !== 'aborted') {
+          alert('语音识别出错，请使用键盘输入');
+        }
+      };
+
+      recognition.onend = () => {
+        setIsRecording(false);
+      };
+
+      recognition.start();
+    } else {
+      alert('您的浏览器不支持语音识别，请使用键盘输入');
+    }
+  };
+
+  const handlePhotoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const newFiles = [...photoFiles, ...files].slice(0, 10);
+    setPhotoFiles(newFiles);
+
+    const newPreviewUrls = newFiles.map(file => URL.createObjectURL(file));
+    photoPreviewUrls.forEach(url => URL.revokeObjectURL(url));
+    setPhotoPreviewUrls(newPreviewUrls);
+  };
+
+  const handleVideoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (videoPreviewUrl) {
+        URL.revokeObjectURL(videoPreviewUrl);
+      }
+      setVideoFile(file);
+      setVideoPreviewUrl(URL.createObjectURL(file));
+    }
+  };
+
+  const handleArchiveFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (archivePreviewUrl) {
+        URL.revokeObjectURL(archivePreviewUrl);
+      }
+      setArchiveFile(file);
+      setArchivePreviewUrl(file.name);
+    }
+  };
+
+  const removePhotoFile = (index: number) => {
+    const newFiles = photoFiles.filter((_, i) => i !== index);
+    setPhotoFiles(newFiles);
+
+    const newPreviewUrls = newFiles.map(file => URL.createObjectURL(file));
+    photoPreviewUrls.forEach(url => URL.revokeObjectURL(url));
+    setPhotoPreviewUrls(newPreviewUrls);
+  };
+
+  const removeVideoFile = () => {
+    if (videoPreviewUrl) {
+      URL.revokeObjectURL(videoPreviewUrl);
+    }
+    setVideoFile(null);
+    setVideoPreviewUrl('');
+  };
+
+  const removeArchiveFile = () => {
+    if (archivePreviewUrl) {
+      URL.revokeObjectURL(archivePreviewUrl);
+    }
+    setArchiveFile(null);
+    setArchivePreviewUrl('');
+  };
+
   const currentQuestion = quizQuestions[currentQuestionIndex];
   const progress = quizQuestions.length > 0 ? ((currentQuestionIndex + 1) / quizQuestions.length) * 100 : 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 py-12 px-4">
+      {/* 开始答题前的提示弹窗 */}
+      {showStartModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-2xl p-8 w-full max-w-2xl border border-gray-700">
+            <div className="text-center mb-6">
+              <div className="text-6xl mb-4">⚠️</div>
+              <h2 className="text-2xl font-bold text-white mb-4">重要提示</h2>
+            </div>
+            
+            <div className="text-gray-300 space-y-4 mb-8">
+              <p>
+                {isSpecialCategory ? (
+                  <>
+                    您选择了<span className="text-yellow-400 font-bold">建筑</span>或<span className="text-yellow-400 font-bold">生电</span>领域，
+                    答题后需要<span className="text-green-400 font-bold">上传您的作品</span>供管理员审核。
+                  </>
+                ) : (
+                  <>
+                    请准备好您的答题内容。
+                  </>
+                )}
+              </p>
+              <div className="bg-gray-900/50 p-4 rounded-lg">
+                <h3 className="text-white font-semibold mb-2">答题说明：</h3>
+                <ul className="text-gray-400 space-y-1 text-sm">
+                  <li>• 总分100分，60分及以上为通过</li>
+                  <li>• 单选题、多选题、判断题计入总分</li>
+                  <li>• 主观题不计入总分，由管理员审核</li>
+                  {isSpecialCategory && (
+                    <li className="text-yellow-400">• 答题通过后需要上传作品（详见下方要求）</li>
+                  )}
+                  {isAdminUser ? (
+                    <li className="text-green-400">• 管理员模式：无限答题次数</li>
+                  ) : (
+                    <li className="text-orange-400">• 每人每天最多答题 <span className="font-bold">3 次</span></li>
+                  )}
+                </ul>
+              </div>
+              {isSpecialCategory && (
+                <div className="bg-yellow-900/30 p-4 rounded-lg border border-yellow-600/50">
+                  <h3 className="text-yellow-400 font-semibold mb-2">作品要求：</h3>
+                  <ul className="text-yellow-300/80 space-y-1 text-sm">
+                    <li>• 存档：必选</li>
+                    <li>• 照片：至少3张</li>
+                    <li>• 视频：至少30秒</li>
+                  </ul>
+                  <p className="text-yellow-300/60 text-xs mt-2">
+                    照片和视频二选一，但存档必须上传
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-4">
+              <button
+                onClick={() => setShowStartModal(false)}
+                className="flex-1 px-6 py-3 bg-gray-600 hover:bg-gray-500 text-white rounded-lg font-semibold transition-all"
+              >
+                返回
+              </button>
+              <button
+                onClick={startQuiz}
+                className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all"
+              >
+                我已了解，开始答题
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 返回重新选择确认弹窗 */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-2xl p-8 w-full max-w-2xl border border-gray-700">
+            <div className="text-center mb-6">
+              <div className="text-6xl mb-4">⚠️</div>
+              <h2 className="text-2xl font-bold text-white mb-4">确认返回</h2>
+            </div>
+            
+            <div className="text-gray-300 mb-8 text-center">
+              <p>确定要返回重新选择题库吗？</p>
+              <p className="text-gray-500 mt-2">已答的题目将被清空！</p>
+            </div>
+
+            <div className="flex gap-4">
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                className="flex-1 px-6 py-3 bg-gray-600 hover:bg-gray-500 text-white rounded-lg font-semibold transition-all"
+              >
+                取消
+              </button>
+              <button
+                onClick={() => {
+                  setShowConfirmModal(false);
+                  resetQuiz();
+                }}
+                className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all"
+              >
+                确认返回
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-white mb-4">白名单申请</h1>
@@ -505,7 +836,15 @@ function ApplyPageContent() {
 
         {currentStep === 0 && (
           <div className="bg-gray-800/50 rounded-2xl p-8 border border-gray-700">
-            <h2 className="text-2xl font-bold text-white mb-6">选择题库类型</h2>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-white">选择题库类型</h2>
+              <button
+                onClick={() => router.push('/')}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+              >
+                返回主页
+              </button>
+            </div>
             <p className="text-gray-400 mb-6">请选择您擅长的领域（最多5个）</p>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
@@ -522,12 +861,13 @@ function ApplyPageContent() {
                         : 'border-gray-600 bg-gray-800 hover:border-gray-500'
                     }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl">{category.icon}</span>
-                      <div>
-                        <h3 className="font-semibold text-white">{category.name}</h3>
-                        <p className="text-sm text-gray-400">{category.description}</p>
-                      </div>
+                    <div className="flex items-center gap-4">
+                      {category.id === 'building' ? (
+                        <Image src="/images/建筑.png" alt="建筑" width={48} height={48} />
+                      ) : (
+                        <span className="text-4xl">{category.icon}</span>
+                      )}
+                      <h3 className="text-xl font-bold text-white">{category.name}</h3>
                     </div>
                     
                     {isSelected && (
@@ -557,9 +897,30 @@ function ApplyPageContent() {
             </div>
 
             <div className="flex justify-between items-center">
-              <span className="text-gray-400">
-                已选择 {Object.keys(selectedCategories).length}/5 个分类
-              </span>
+              <div className="flex gap-4">
+                <span className="text-gray-400">
+                  已选择 {Object.keys(selectedCategories).length}/5 个分类
+                </span>
+                {!isAdminUser && quizAttemptsRemaining >= 0 && (
+                  <span className={`font-semibold ${
+                    isLimited
+                      ? 'text-red-400 bg-red-900/30 px-3 py-1 rounded-full'
+                      : quizAttemptsRemaining === 0
+                      ? 'text-green-400'
+                      : quizAttemptsRemaining === 1
+                      ? 'text-yellow-400'
+                      : 'text-orange-400'
+                  }`}>
+                    {3 - quizAttemptsRemaining}/3 答题
+                    {isLimited && ' ⚠️ 次数已用完'}
+                  </span>
+                )}
+                {!isAdminUser && quizAttemptsRemaining < 0 && (
+                  <span className="text-green-400 font-semibold">
+                    管理员模式（无限次）
+                  </span>
+                )}
+              </div>
               <button
                 onClick={generateQuiz}
                 disabled={Object.keys(selectedCategories).length === 0}
@@ -631,172 +992,228 @@ function ApplyPageContent() {
                       ? 'bg-blue-500/20 text-blue-400'
                       : currentQuestion.type === 'multiple'
                         ? 'bg-purple-500/20 text-purple-400'
-                        : 'bg-orange-500/20 text-orange-400'
+                        : currentQuestion.type === 'judgment'
+                          ? 'bg-orange-500/20 text-orange-400'
+                          : 'bg-cyan-500/20 text-cyan-400'
                   }`}>
                     {currentQuestion.type === 'single' 
                       ? '单选题' 
                       : currentQuestion.type === 'multiple'
                         ? '多选题'
-                        : '判断题'}
+                        : currentQuestion.type === 'judgment'
+                          ? '判断题'
+                          : '主观题'}
                   </span>
-                  {currentQuestion.required && (
-                    <span className="px-3 py-1 rounded-full text-sm bg-red-500/20 text-red-400">
-                      必答题
-                    </span>
+                  {currentQuestion.type !== 'scenario' && (
+                    <span className="text-gray-500 text-xs">{currentQuestion.score}分</span>
+                  )}
+                  {currentQuestion.type === 'scenario' && (
+                    <span className="text-gray-500 text-xs">不计分</span>
                   )}
                   <span className="text-gray-500 text-sm">{currentQuestion.categoryName}</span>
                 </div>
 
                 <h3 className="text-xl text-white mb-6">{currentQuestion.question}</h3>
 
-                <div className="space-y-3">
-                  {currentQuestion.options.map((option, idx) => {
-                    const isSelected = userAnswers[currentQuestionIndex]?.includes(idx);
-                    return (
+                {currentQuestion.type === 'scenario' ? (
+                  <div className="space-y-3">
+                    <div className="flex gap-2 mb-2">
                       <button
-                        key={idx}
-                        onClick={() => handleOptionToggle(idx)}
-                        className={`w-full p-4 rounded-lg border-2 text-left transition-all ${
-                          isSelected
-                            ? 'border-green-500 bg-green-500/10 text-white'
-                            : 'border-gray-600 bg-gray-800 text-gray-300 hover:border-gray-500'
+                        type="button"
+                        onClick={() => handleVoiceInput(currentQuestionIndex)}
+                        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
+                          isRecording 
+                            ? 'bg-red-600 hover:bg-red-700 text-white animate-pulse' 
+                            : 'bg-blue-600 hover:bg-blue-700 text-white'
                         }`}
                       >
-                        <span className="font-semibold mr-3">{String.fromCharCode(65 + idx)}.</span>
-                        {option}
+                        🎤 {isRecording ? '录音中...' : '语音输入'}
                       </button>
-                    );
-                  })}
-                </div>
+                      <span className="text-gray-400 text-sm self-center">
+                        {isRecording ? '再次点击停止录音' : '或直接输入文字'}
+                      </span>
+                    </div>
+                    <textarea
+                      value={scenarioTextAnswers[currentQuestionIndex] || ''}
+                      onChange={(e) => handleScenarioTextChange(currentQuestionIndex, e.target.value)}
+                      className="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white focus:border-blue-500 focus:outline-none min-h-[200px]"
+                      placeholder={isRecording ? '说话中...' : '请详细描述您的回答...'}
+                    />
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {currentQuestion.options.map((option, idx) => {
+                      const isSelected = userAnswers[currentQuestionIndex]?.includes(idx);
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => handleOptionToggle(idx)}
+                          className={`w-full p-4 rounded-lg border-2 text-left transition-all ${
+                            isSelected
+                              ? 'border-green-500 bg-green-500/10 text-white'
+                              : 'border-gray-600 bg-gray-800 text-gray-300 hover:border-gray-500'
+                          }`}
+                        >
+                          <span className="font-semibold mr-3">{String.fromCharCode(65 + idx)}.</span>
+                          {option}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 
-            <div className="flex justify-between">
+            <div className="flex justify-between items-center">
               <button
-                onClick={handlePrevQuestion}
-                disabled={currentQuestionIndex === 0}
-                className={`px-6 py-3 rounded-lg font-semibold transition-all ${
-                  currentQuestionIndex === 0
-                    ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                    : 'bg-gray-600 hover:bg-gray-500 text-white'
-                }`}
+                onClick={() => setShowConfirmModal(true)}
+                className="px-6 py-3 rounded-lg font-semibold transition-all bg-red-600 hover:bg-red-700 text-white"
               >
-                上一题
+                返回重新选择
               </button>
+              
+              <div className="flex gap-4">
+                <button
+                  onClick={handlePrevQuestion}
+                  disabled={currentQuestionIndex === 0}
+                  className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+                    currentQuestionIndex === 0
+                      ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                      : 'bg-gray-600 hover:bg-gray-500 text-white'
+                  }`}
+                >
+                  上一题
+                </button>
 
-              <button
-                onClick={handleNextQuestion}
-                disabled={!userAnswers[currentQuestionIndex]?.length}
-                className={`px-6 py-3 rounded-lg font-semibold transition-all ${
-                  !userAnswers[currentQuestionIndex]?.length
-                    ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                    : 'bg-blue-600 hover:bg-blue-700 text-white'
-                }`}
-              >
-                {currentQuestionIndex === quizQuestions.length - 1 ? '提交试卷' : '下一题'}
-              </button>
+                <button
+                  onClick={handleNextQuestion}
+                  disabled={(() => {
+                    const currentQ = quizQuestions[currentQuestionIndex];
+                    if (currentQ?.type === 'scenario') {
+                      // 主观题检查文字输入
+                      const textAnswer = scenarioTextAnswers[currentQuestionIndex];
+                      return !textAnswer || textAnswer.trim() === '';
+                    } else {
+                      // 选择题检查选项
+                      return !userAnswers[currentQuestionIndex]?.length;
+                    }
+                  })()}
+                  className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+                    (() => {
+                      const currentQ = quizQuestions[currentQuestionIndex];
+                      if (currentQ?.type === 'scenario') {
+                        const textAnswer = scenarioTextAnswers[currentQuestionIndex];
+                        return !textAnswer || textAnswer.trim() === '';
+                      } else {
+                        return !userAnswers[currentQuestionIndex]?.length;
+                      }
+                    })()
+                      ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                      : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  }`}
+                >
+                  {currentQuestionIndex === quizQuestions.length - 1 ? '提交试卷' : '下一题'}
+                </button>
+              </div>
             </div>
           </div>
         )}
 
         {showResult && (
           <div className="bg-gray-800/50 rounded-2xl p-8 border border-gray-700">
-            {failedRequired ? (
-              <div className="text-center">
-                <div className="text-6xl mb-4">❌</div>
-                <h2 className="text-2xl font-bold text-red-400 mb-4">必答题答错</h2>
-                <p className="text-gray-400 mb-6">您没有答对必答题，考试不通过，请重新答题。</p>
-                <div className="text-left mb-6 bg-gray-900/50 p-4 rounded-lg">
-                  <h3 className="text-white font-semibold mb-3">错题回顾：</h3>
-                  {quizQuestions.map((question, index) => {
-                    const userAnswer = userAnswers[index] || [];
-                    const correctAnswer = Array.isArray(question.correct) ? question.correct : [question.correct];
-                    const isCorrect = userAnswer.length === correctAnswer.length && 
-                                      userAnswer.every(a => correctAnswer.includes(a));
-                    
-                    if (question.required && !isCorrect) {
-                      return (
-                        <div key={index} className="mb-4 p-3 bg-red-500/10 rounded border border-red-500/30">
-                          <p className="text-red-400 font-semibold mb-2">必答题 {index + 1} (答错)</p>
-                          <p className="text-white mb-2">{question.question}</p>
-                          <p className="text-gray-400 text-sm">
-                            正确答案: {correctAnswer.map(i => `${String.fromCharCode(65 + i)}.${question.options[i]}`).join(', ')}
-                          </p>
-                        </div>
-                      );
-                    }
-                    return null;
-                  })}
+            <div>
+              <div className="text-center mb-6">
+                <div className="text-6xl mb-4">
+                  {(() => {
+                    const { earnedScore, totalScore } = calculateScore();
+                    return earnedScore >= 60 ? '✅' : '❌';
+                  })()}
                 </div>
-                <button
-                  onClick={resetQuiz}
-                  className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all"
-                >
-                  重新答题
-                </button>
+                <h2 className="text-2xl font-bold text-white mb-4">
+                  {(() => {
+                    const { earnedScore } = calculateScore();
+                    return earnedScore >= 60 ? '测试通过！' : '测试未通过';
+                  })()}
+                </h2>
+                <p className="text-3xl font-bold text-blue-400 mb-2">
+                  {(() => {
+                    const { earnedScore, totalScore } = calculateScore();
+                    return `${earnedScore} / ${totalScore}`;
+                  })()} 分
+                </p>
+                <p className="text-gray-400 mb-6">
+                  {(() => {
+                    const { earnedScore, totalScore, percentage } = calculateScore();
+                    return `正确率: ${percentage.toFixed(1)}%`;
+                  })()}
+                  {(() => {
+                    const { earnedScore } = calculateScore();
+                    return earnedScore >= 60 
+                      ? ' (≥60分 通过)' 
+                      : ' (需要 ≥60分 才能通过)';
+                  })()}
+                </p>
               </div>
-            ) : (
-              <div>
-                <div className="text-center mb-6">
-                  <div className="text-6xl mb-4">
-                    {calculateScore() / quizQuestions.length >= 0.85 ? '✅' : '❌'}
-                  </div>
-                  <h2 className="text-2xl font-bold text-white mb-4">
-                    {calculateScore() / quizQuestions.length >= 0.85 ? '测试通过！' : '测试未通过'}
-                  </h2>
-                  <p className="text-3xl font-bold text-blue-400 mb-2">
-                    {calculateScore()} / {quizQuestions.length}
-                  </p>
-                  <p className="text-gray-400 mb-6">
-                    正确率: {((calculateScore() / quizQuestions.length) * 100).toFixed(1)}%
-                    {calculateScore() / quizQuestions.length >= 0.85 
-                      ? ' (≥85% 通过)' 
-                      : ' (需要 ≥85% 才能通过)'}
-                  </p>
-                </div>
 
-                {/* 显示所有题目和答案 */}
-                <div className="text-left mb-6 bg-gray-900/50 p-4 rounded-lg max-h-96 overflow-y-auto">
-                  <h3 className="text-white font-semibold mb-3">答题详情：</h3>
-                  {quizQuestions.map((question, index) => {
-                    const userAnswer = userAnswers[index] || [];
-                    const correctAnswer = Array.isArray(question.correct) ? question.correct : [question.correct];
-                    const isCorrect = userAnswer.length === correctAnswer.length && 
-                                      userAnswer.every(a => correctAnswer.includes(a));
-                    
-                    return (
-                      <div key={index} className={`mb-4 p-3 rounded border ${
-                        isCorrect 
+              {/* 显示所有题目和答案 */}
+              <div className="text-left mb-6 bg-gray-900/50 p-4 rounded-lg max-h-[400px] overflow-y-auto">
+                <h3 className="text-white font-semibold mb-3">答题详情：</h3>
+                {quizQuestions.map((question, index) => {
+                  const userAnswer = userAnswers[index] || [];
+                  const correctAnswer = Array.isArray(question.correct) ? question.correct : [question.correct];
+                  const isCorrect = question.type === 'scenario' ? true : 
+                    (userAnswer.length === correctAnswer.length && userAnswer.every(a => correctAnswer.includes(a)));
+                  
+                  return (
+                    <div key={index} className={`mb-4 p-3 rounded border ${
+                      question.type === 'scenario' 
+                        ? 'bg-cyan-500/10 border-cyan-500/30' 
+                        : isCorrect 
                           ? 'bg-green-500/10 border-green-500/30' 
                           : 'bg-red-500/10 border-red-500/30'
-                      }`}>
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className={`text-sm ${isCorrect ? 'text-green-400' : 'text-red-400'}`}>
-                            {isCorrect ? '✓' : '✗'} 第{index + 1}题
+                    }`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={`text-sm ${
+                          question.type === 'scenario' ? 'text-cyan-400' : isCorrect ? 'text-green-400' : 'text-red-400'
+                        }`}>
+                          {question.type === 'scenario' ? '📝' : isCorrect ? '✓' : '✗'} 第{index + 1}题
+                        </span>
+                        {question.type === 'scenario' && (
+                          <span className="px-2 py-0.5 rounded text-xs bg-blue-500/20 text-blue-400">
+                            主观题(不记分)
                           </span>
-                          {question.required && (
-                            <span className="px-2 py-0.5 rounded text-xs bg-red-500/20 text-red-400">
-                              必答
-                            </span>
-                          )}
-                          <span className="text-gray-500 text-xs">{question.categoryName}</span>
-                        </div>
-                        <p className="text-white mb-2">{question.question}</p>
-                        <p className="text-gray-400 text-sm">
-                          您的答案: {userAnswer.length > 0 
-                            ? userAnswer.map(i => `${String.fromCharCode(65 + i)}.${question.options[i]}`).join(', ')
-                            : '未作答'}
-                        </p>
-                        <p className="text-green-400 text-sm">
-                          正确答案: {correctAnswer.map(i => `${String.fromCharCode(65 + i)}.${question.options[i]}`).join(', ')}
-                        </p>
+                        )}
+                        {question.type !== 'scenario' && (
+                          <span className="text-gray-500 text-xs">{question.score}分</span>
+                        )}
+                        <span className="text-gray-500 text-xs">{question.categoryName}</span>
                       </div>
-                    );
-                  })}
-                </div>
+                      <p className="text-white mb-2">{question.question}</p>
+                      {question.type === 'scenario' ? (
+                        <p className="text-gray-400 text-sm">
+                          您的回答: {scenarioTextAnswers[index] || '未作答'}
+                        </p>
+                      ) : (
+                        <>
+                          <p className="text-gray-400 text-sm">
+                            您的答案: {userAnswer.length > 0 
+                              ? userAnswer.map(i => `${String.fromCharCode(65 + i)}.${question.options[i]}`).join(', ')
+                              : '未作答'}
+                          </p>
+                          <p className="text-green-400 text-sm">
+                            正确答案: {correctAnswer.map(i => `${String.fromCharCode(65 + i)}.${question.options[i]}`).join(', ')}
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
 
-                <div className="text-center">
-                  {calculateScore() / quizQuestions.length >= 0.85 ? (
+              <div className="text-center">
+                {(() => {
+                  const { earnedScore } = calculateScore();
+                  return earnedScore >= 60 ? (
                     <button
                       onClick={handleQuizComplete}
                       className="px-8 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all"
@@ -810,10 +1227,10 @@ function ApplyPageContent() {
                     >
                       重新答题
                     </button>
-                  )}
-                </div>
+                  );
+                })()}
               </div>
-            )}
+            </div>
           </div>
         )}
 
@@ -971,7 +1388,7 @@ function ApplyPageContent() {
               <div>
                 <label className="block text-gray-300 mb-2">擅长类型</label>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {['建筑', '生存', '养老', '红石', '指令', 'PVP战斗', '探险', '下界', '末地', '酿造', '附魔', '钓鱼', '交易', '农业与养殖', '矿物与挖矿'].map((skill) => {
+                  {['建筑', '生存', '指令', '生电', '附魔与酿造'].map((skill) => {
                     const isSelected = formData.skillType.includes(skill);
                     return (
                       <label key={skill} className="flex items-center space-x-2 p-3 bg-gray-900 border border-gray-700 rounded-lg">
@@ -990,6 +1407,95 @@ function ApplyPageContent() {
                 </div>
                 <p className="mt-1 text-sm text-gray-500">根据您选择的题库自动生成，无需手动选择。</p>
               </div>
+
+              {/* 作品上传 - 如果选择了建筑或生电 */}
+              {isSpecialCategory && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-gray-300 mb-2">存档文件 <span className="text-red-500">* 必填</span></label>
+                    <p className="mb-3 text-xs text-gray-500">请上传您的存档文件</p>
+                    <input
+                      type="file"
+                      accept=".zip,.rar,.7z,.world"
+                      onChange={handleArchiveFileChange}
+                      className="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white focus:border-blue-500 focus:outline-none file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-green-600 file:text-white hover:file:bg-green-700 file:cursor-pointer"
+                    />
+                    {archivePreviewUrl && (
+                      <div className="mt-2 flex items-center gap-2 text-green-400">
+                        <span>✓</span>
+                        <span className="text-sm">{archivePreviewUrl}</span>
+                        <button
+                          type="button"
+                          onClick={removeArchiveFile}
+                          className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs"
+                        >
+                          删除
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-gray-300 mb-2">照片 <span className="text-yellow-500">* 至少3张</span></label>
+                    <p className="mb-3 text-xs text-gray-500">请上传您的建筑作品截图（至少3张）</p>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handlePhotoFileChange}
+                      className="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white focus:border-blue-500 focus:outline-none file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 file:cursor-pointer"
+                    />
+                    {photoPreviewUrls.length > 0 && (
+                      <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+                        {photoPreviewUrls.map((url, idx) => (
+                          <div key={idx} className="relative bg-gray-900 rounded-lg border border-gray-700 p-2">
+                            <img
+                              src={url}
+                              alt={`照片 ${idx + 1}`}
+                              className="w-full h-32 object-cover rounded"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removePhotoFile(idx)}
+                              className="absolute top-1 right-1 w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded-full flex items-center justify-center"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <p className="mt-2 text-xs text-gray-500">已上传 {photoFiles.length}/10 张照片</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-gray-300 mb-2">视频 <span className="text-gray-500">可选</span></label>
+                    <p className="mb-3 text-xs text-gray-500">请上传您的作品视频（至少30秒）</p>
+                    <input
+                      type="file"
+                      accept="video/*"
+                      onChange={handleVideoFileChange}
+                      className="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white focus:border-blue-500 focus:outline-none file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 file:cursor-pointer"
+                    />
+                    {videoPreviewUrl && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <video
+                          src={videoPreviewUrl}
+                          controls
+                          className="w-full max-h-48 rounded-lg"
+                        />
+                        <button
+                          type="button"
+                          onClick={removeVideoFile}
+                          className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs"
+                        >
+                          删除
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* 是否被ban - 了解玩家历史记录 */}
               <div>

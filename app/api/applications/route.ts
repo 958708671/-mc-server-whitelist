@@ -70,7 +70,8 @@ export async function POST(request: NextRequest) {
     const data = await request.json();
     const { minecraft_id, age, contact, reason, quiz_category, quiz_score, quiz_total, 
             play_time, favorite_mode, server_experience, gender, country, 
-            how_found, discord_id, play_style, griefing_history, additional_info } = data;
+            how_found, discord_id, play_style, griefing_history, additional_info,
+            work_files, scenario_answers } = data;
     
     if (!minecraft_id || !contact) {
       return NextResponse.json(

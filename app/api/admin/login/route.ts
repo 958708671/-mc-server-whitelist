@@ -3,19 +3,24 @@ import sql, { withRetry } from '@/lib/db';
 import { setSessionCookie } from '@/lib/auth';
 import bcrypt from 'bcryptjs';
 
+// 简单的内存存储登录失败计数（生产环境应使用Redis）
+const loginFailures = new Map<string, { count: number; lastFail: number }>();
+const MAX_FAILURES = 3;
+const LOCKOUT_DURATION = 60 * 1000; // 1分钟冷却
+
 // 获取客户端IP地址
 const getClientIP = (request: NextRequest): string => {
   const forwarded = request.headers.get('x-forwarded-for');
   const realIP = request.headers.get('x-real-ip');
-  
+
   if (forwarded) {
     return forwarded.split(',')[0].trim();
   }
-  
+
   if (realIP) {
     return realIP;
   }
-  
+
   return 'unknown';
 };
 
@@ -24,77 +29,78 @@ export async function POST(request: NextRequest) {
   try {
     const { username, password } = await request.json();
     const clientIP = getClientIP(request);
-    
+
     if (!username || !password) {
       return NextResponse.json(
         { success: false, message: '请输入用户名和密码' },
         { status: 400 }
       );
     }
-    
-    // 查询管理员 - 支持用 username 或 qq 登录（使用重试机制）
+
+    // 检查冷却状态
+    const failureInfo = loginFailures.get(clientIP);
+    if (failureInfo && failureInfo.count >= MAX_FAILURES) {
+      const now = Date.now();
+      if (now - failureInfo.lastFail < LOCKOUT_DURATION) {
+        const remainingSeconds = Math.ceil((LOCKOUT_DURATION - (now - failureInfo.lastFail)) / 1000);
+        return NextResponse.json(
+          { success: false, message: `登录失败次数过多，请 ${remainingSeconds} 秒后重试` },
+          { status: 429 }
+        );
+      } else {
+        // 冷却时间已过，重置计数
+        loginFailures.delete(clientIP);
+      }
+    }
+
+    // 查询管理员
     const admins = await withRetry(async () => {
       return await sql`
-        SELECT id, username, display_name, qq, is_owner, password FROM admins 
+        SELECT id, username, display_name, qq, is_owner, password FROM admins
         WHERE (username = ${username} OR qq = ${username})
       `;
     });
-    
+
     if (admins.length === 0) {
+      // 记录失败
+      updateFailureCount(clientIP);
       return NextResponse.json(
         { success: false, message: '用户名或密码错误' },
         { status: 401 }
       );
     }
-    
+
     const admin = admins[0];
     const storedPassword: string = admin.password;
-    
-    // 判断密码是否已哈希（bcrypt hash 以 $2b$ 或 $2a$ 开头）
-    const isHashed = storedPassword.startsWith('$2b$') || storedPassword.startsWith('$2a$');
-    let passwordValid = false;
-    
-    if (isHashed) {
-      passwordValid = await bcrypt.compare(password, storedPassword);
-    } else {
-      // 旧明文密码：直接比较，验证通过后自动升级为 bcrypt hash
-      passwordValid = storedPassword === password;
-      if (passwordValid) {
-        // 自动升级为 bcrypt hash
-        const hashed = await bcrypt.hash(password, 12);
-        await withRetry(async () => {
-          return await sql`UPDATE admins SET password = ${hashed} WHERE id = ${admin.id}`;
-        });
-        console.log(`[Auth] 已将管理员 ${admin.username} 的密码升级为 bcrypt 哈希`);
-      }
-    }
-    
+
+    // 验证密码
+    const passwordValid = await bcrypt.compare(password, storedPassword);
+
     if (!passwordValid) {
+      // 记录失败
+      updateFailureCount(clientIP);
       return NextResponse.json(
         { success: false, message: '用户名或密码错误' },
         { status: 401 }
       );
     }
-    
-    // 记录登录日志（包含IP地址）
+
+    // 登录成功，清除失败记录
+    loginFailures.delete(clientIP);
+
+    // 记录成功登录日志
     try {
-      const roleText = admin.is_owner ? '服主' : '管理员';
-      // 如果 display_name 已经包含角色信息，只使用 display_name
       const displayName = admin.display_name || admin.username;
-      const details = displayName === roleText 
-        ? `${displayName} 登录成功`
-        : `${roleText} ${displayName} 登录成功`;
-      
       await withRetry(async () => {
         return await sql`
           INSERT INTO admin_logs (admin_id, action, details, ip_address, created_at)
-          VALUES (${admin.id}, 'login', ${details}, ${clientIP}, NOW())
+          VALUES (${admin.id}, 'login', ${displayName} 登录成功, ${clientIP}, NOW())
         `;
       });
     } catch (logError) {
       console.error('记录登录日志失败:', logError);
     }
-    
+
     const responseBody = {
       success: true,
       user: admin.username,
@@ -102,9 +108,8 @@ export async function POST(request: NextRequest) {
       qq: admin.qq,
       isOwner: admin.is_owner,
     };
-    
+
     const response = NextResponse.json(responseBody);
-    // 设置 httpOnly session cookie
     setSessionCookie(response, {
       adminId: admin.id,
       username: admin.username,
@@ -112,12 +117,23 @@ export async function POST(request: NextRequest) {
       qq: admin.qq || '',
     });
     return response;
-    
+
   } catch (error: any) {
     console.error('登录失败:', error);
     return NextResponse.json(
-      { success: false, message: '登录失败，请检查用户名和密码' },
+      { success: false, message: '登录失败，请稍后重试' },
       { status: 500 }
     );
+  }
+}
+
+function updateFailureCount(clientIP: string) {
+  const now = Date.now();
+  const existing = loginFailures.get(clientIP);
+  if (existing) {
+    existing.count += 1;
+    existing.lastFail = now;
+  } else {
+    loginFailures.set(clientIP, { count: 1, lastFail: now });
   }
 }

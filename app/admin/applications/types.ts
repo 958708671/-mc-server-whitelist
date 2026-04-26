@@ -31,6 +31,9 @@ export interface Application {
   quiz_total: number | null;
   // IP地址
   ip_address?: string;
+  // 作品相关
+  work_files?: string[]; // 作品图片URL数组
+  scenario_answers?: Record<number, string>; // 实景题答案
 }
 
 export interface AdminInfo {

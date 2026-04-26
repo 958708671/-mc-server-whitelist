@@ -15,20 +15,20 @@ function PasswordModal({ adminId, onClose }: { adminId: number; onClose: () => v
       setMessage('请填写所有字段');
       return;
     }
-    
+
     if (newPassword !== confirmPassword) {
       setMessage('两次输入的新密码不一致');
       return;
     }
-    
+
     if (newPassword.length < 6) {
       setMessage('密码长度至少6位');
       return;
     }
-    
+
     setLoading(true);
     setMessage('');
-    
+
     try {
       const response = await fetch('/api/admin/password', {
         method: 'POST',
@@ -39,7 +39,7 @@ function PasswordModal({ adminId, onClose }: { adminId: number; onClose: () => v
           newPassword
         })
       });
-      
+
       const result = await response.json();
       if (result.success) {
         setMessage('密码修改成功！');
@@ -60,7 +60,7 @@ function PasswordModal({ adminId, onClose }: { adminId: number; onClose: () => v
         <div className="flex items-center gap-3 mb-6">
           <h2 className="text-xl font-bold text-white">修改密码</h2>
         </div>
-        
+
         <div className="space-y-4">
           <div>
             <label className="block text-white text-sm mb-2">原密码</label>
@@ -72,7 +72,7 @@ function PasswordModal({ adminId, onClose }: { adminId: number; onClose: () => v
               placeholder="请输入原密码"
             />
           </div>
-          
+
           <div>
             <label className="block text-white text-sm mb-2">新密码</label>
             <input
@@ -83,7 +83,7 @@ function PasswordModal({ adminId, onClose }: { adminId: number; onClose: () => v
               placeholder="请输入新密码"
             />
           </div>
-          
+
           <div>
             <label className="block text-white text-sm mb-2">确认新密码</label>
             <input
@@ -94,14 +94,14 @@ function PasswordModal({ adminId, onClose }: { adminId: number; onClose: () => v
               placeholder="请再次输入新密码"
             />
           </div>
-          
+
           {message && (
             <div className="text-sm text-white">
               {message}
             </div>
           )}
         </div>
-        
+
         <div className="flex gap-3 mt-6">
           <button
             onClick={onClose}
@@ -137,6 +137,7 @@ export default function AdminLayout({
   const [adminInfo, setAdminInfo] = useState<AdminInfo | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [qqAvatarLoaded, setQqAvatarLoaded] = useState(false);
   const pathname = usePathname();
   const sidebarRef = useRef<HTMLDivElement>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -154,6 +155,15 @@ export default function AdminLayout({
       window.location.href = '/';
     }
   }, []);
+
+  useEffect(() => {
+    if (adminInfo?.qq) {
+      const timer = setTimeout(() => {
+        setQqAvatarLoaded(true);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [adminInfo?.qq]);
 
   const handleMouseEnter = () => {
     if (hoverTimeoutRef.current) {
@@ -190,6 +200,9 @@ export default function AdminLayout({
     { category: '数据统计', items: [
       { name: '数据面板', path: '/admin/statistics' },
     ]},
+    { category: '系统帮助', items: [
+      { name: '管理员守则', path: '/admin/guidelines' },
+    ]},
   ];
 
   const ownerMenuItems = [
@@ -211,8 +224,12 @@ export default function AdminLayout({
     ]},
     { category: '服主专属', items: [
       { name: '管理员管理', path: '/admin/admins' },
+      { name: '答题次数管理', path: '/admin/quiz-attempts' },
       { name: '操作日志', path: '/admin/logs' },
       { name: '系统设置', path: '/admin/settings' },
+    ]},
+    { category: '系统帮助', items: [
+      { name: '管理员守则', path: '/admin/guidelines' },
     ]},
   ];
 
@@ -235,7 +252,6 @@ export default function AdminLayout({
       backgroundPosition: 'center',
       backgroundRepeat: 'no-repeat'
     }}>
-      {/* 左侧边栏 */}
       <aside
         ref={sidebarRef}
         onMouseEnter={handleMouseEnter}
@@ -252,7 +268,7 @@ export default function AdminLayout({
               </h1>
               <div className="flex items-center gap-2 mt-2">
                 <div className="w-8 h-8 bg-white/20 border border-white/20 rounded-lg overflow-hidden flex items-center justify-center">
-                  {adminInfo.qq ? (
+                  {adminInfo.qq && qqAvatarLoaded ? (
                     <img
                       src={`https://q.qlogo.cn/g?b=qq&nk=${adminInfo.qq}&s=100`}
                       alt="QQ头像"
@@ -317,7 +333,6 @@ export default function AdminLayout({
         </div>
       </aside>
 
-      {/* 侧边栏展开按钮 */}
       {sidebarCollapsed && (
         <div
           onMouseEnter={handleMouseEnter}
@@ -338,7 +353,7 @@ export default function AdminLayout({
       </main>
 
       {showPasswordModal && (
-        <PasswordModal 
+        <PasswordModal
           adminId={adminInfo.adminId}
           onClose={() => setShowPasswordModal(false)}
         />
@@ -349,9 +364,9 @@ export default function AdminLayout({
 
 function CategoryModule({ category, pathname, collapsed }: { category: any; pathname: string; collapsed: boolean }) {
   const [expanded, setExpanded] = useState(true);
-  
+
   const isActive = category.items.some((item: any) => pathname === item.path);
-  
+
   if (collapsed) {
     return (
       <div className="space-y-1">
@@ -371,7 +386,7 @@ function CategoryModule({ category, pathname, collapsed }: { category: any; path
       </div>
     );
   }
-  
+
   return (
     <div className={`border rounded-xl transition-all duration-300 ${
       isActive
@@ -387,15 +402,15 @@ function CategoryModule({ category, pathname, collapsed }: { category: any; path
         }`}>
           {category.category}
         </span>
-        <svg 
+        <svg
           className={`w-3 h-3 text-white/60 transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`}
-          fill="currentColor" 
+          fill="currentColor"
           viewBox="0 0 24 24"
         >
           <path d="M8 5l8 7-8 7V5z" />
         </svg>
       </button>
-      
+
       {expanded && (
         <div className="px-3 pb-3 space-y-1">
           {category.items.map((item: any) => (

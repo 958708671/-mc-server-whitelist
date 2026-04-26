@@ -465,10 +465,42 @@ export default function ApplicationsPage() {
                 </div>
               )}
               
+              {/* 作品展示 */}
+              {selectedApp.work_files && selectedApp.work_files.length > 0 && (
+                <div className="rounded-lg p-4" style={{border: '1px solid rgba(93, 122, 156, 0.8)', backgroundColor: 'rgba(93, 122, 156, 0.8)'}}>
+                  <h3 className="text-lg font-bold text-white mb-3">玩家作品</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {selectedApp.work_files.map((url, idx) => (
+                      <div key={idx} className="relative bg-gray-900 rounded-lg border border-gray-700 p-2">
+                        <img
+                          src={url}
+                          alt={`作品 ${idx + 1}`}
+                          className="w-full h-32 object-cover rounded"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* 其他信息 */}
-              {selectedApp.server_experience || selectedApp.griefing_history || selectedApp.additional_info && (
+              {selectedApp.server_experience || selectedApp.griefing_history || selectedApp.additional_info || (selectedApp.scenario_answers && Object.keys(selectedApp.scenario_answers).length > 0) && (
                 <div className="rounded-lg p-4" style={{border: '1px solid rgba(93, 122, 156, 0.8)', backgroundColor: 'rgba(93, 122, 156, 0.8)'}}>
                   <h3 className="text-lg font-bold text-white mb-3">其他信息</h3>
+                  
+                  {/* 实景题答案 */}
+                  {selectedApp.scenario_answers && Object.keys(selectedApp.scenario_answers).length > 0 && (
+                    <div className="mb-3">
+                      <div className="text-white/60 mb-1">实景题答案</div>
+                      {Object.entries(selectedApp.scenario_answers).map(([key, value]: [string, string]) => (
+                        <div key={key} className="text-white text-sm mb-2 p-2 bg-gray-900 rounded">
+                          <span className="text-green-400">第{parseInt(key) + 1}题: </span>
+                          {value}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
                   {selectedApp.server_experience && (
                     <div className="mb-3">
                       <div className="text-white/60 mb-1">服务器经验</div>
