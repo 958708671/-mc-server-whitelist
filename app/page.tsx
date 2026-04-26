@@ -1592,7 +1592,7 @@ export default function HomePage() {
                             onClick={() => {
                               if (agreeToTerms) {
                                 setShowTermsModal(false);
-                                window.location.href = '/apply/form';
+                                window.location.href = '/apply/quiz';
                               }
                             }}
                             disabled={!agreeToTerms}
