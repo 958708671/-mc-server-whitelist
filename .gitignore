@@ -1,65 +1,22 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# 测试和文档文件
+测试清单.md
+Minecraft服务器白名单管理系统完整文档.md
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
+# 本地 UI 测试图片
+public/images/工作台UI.png
+public/images/熔炉UI.png
+public/images/酿造台UI.png
+public/images/运输矿车UI.png
+public/images/漏斗UI.png
+public/images/高炉UI.png
+public/images/烟熏炉UI.png
+public/images/切石机UI.png
+public/images/织布机UI.png
+public/images/锻造台UI.png
+public/images/村民UI.png
 
-# testing
-/coverage
+# 脚本文件
+scripts/
 
-# next.js
-/.next/
-/out/
-
-# production
-/build
-
-# misc
-.DS_Store
-*.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-# env files (can opt-in for committing if needed)
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-
-# Mock database files (local only)
-lib/mock-db.ts
-lib/db-sync.ts
-app/api/dev/mock-db/route.ts
-app/api/sync/route.ts
-components/SyncMonitor.tsx
-components/OfflineStatusBar.tsx
-
-# Mock database data directory
-data/
-
-# Environment files
-.vercel
-.env*.local
-
-# Local development directory
-local-dev/
-
-# Backup directory
-backup/
+# 本地测试文件
+*.local
