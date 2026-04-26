@@ -3,6 +3,9 @@ import { neon } from '@neondatabase/serverless';
 const sql = neon(process.env.DATABASE_URL || '', {
   fetchOptions: {
     timeout: 10000,
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8'
+    }
   }
 });
 

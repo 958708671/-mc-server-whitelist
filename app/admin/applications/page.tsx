@@ -9,8 +9,6 @@ export default function ApplicationsPage() {
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'pending' | 'reviewed'>('pending');
-  const [selectedApp, setSelectedApp] = useState<Application | null>(null);
-  const [reviewNote, setReviewNote] = useState('');
   const [processing, setProcessing] = useState(false);
   const [adminInfo, setAdminInfo] = useState<AdminInfo | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -141,60 +139,7 @@ export default function ApplicationsPage() {
     exportToCsv(exportData, `白名单申请_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.csv`);
   };
 
-  const handleReview = async (appId: number, status: 'approved' | 'rejected') => {
-    if (!adminInfo) return;
-    
-    setProcessing(true);
-    let message = '';
-    
-    // 立即关闭弹窗
-    setSelectedApp(null);
-    
-    try {
-      const response = await fetch(`/api/applications/${appId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status,
-          reviewer: adminInfo.user,
-          reviewerId: adminInfo.adminId,
-          note: reviewNote
-        })
-      });
-      
-      if (!response.ok) {
-        throw new Error('网络请求失败');
-      }
-      
-      const result = await response.json();
-      if (result.success) {
-        message = status === 'approved' ? '审核通过成功' : '审核拒绝成功';
-        // 如果是审核通过，显示白名单添加结果
-        if (status === 'approved' && result.whitelistResult) {
-          const whitelistMsg = result.whitelistResult.success 
-            ? `白名单添加成功: ${result.whitelistResult.message}`
-            : `白名单添加失败: ${result.whitelistResult.message}`;
-          message += `\n${whitelistMsg}`;
-        }
-      } else {
-        message = result.message || '操作失败';
-      }
-    } catch (error) {
-      console.error('操作失败:', error);
-      message = '操作失败，请重试';
-    } finally {
-      setReviewNote('');
-      setProcessing(false);
-      // 强制刷新页面
-      setTimeout(() => {
-        fetchApplications();
-        console.log('申请列表已刷新');
-      }, 100);
-      if (message) {
-        setTimeout(() => alert(message), 200);
-      }
-    }
-  };
+
 
   const handleAddToBlacklistClick = (app: Application) => {
     setBlacklistTarget(app);
@@ -364,8 +309,7 @@ export default function ApplicationsPage() {
                       <div className="flex gap-2">
                         <button
                           onClick={() => {
-                            setSelectedApp(app);
-                            setReviewNote('');
+                            window.location.href = `/admin/applications/${app.id}`;
                           }}
                           className="px-3 py-1.5 hover:bg-white/30 text-white rounded-lg transition-all text-sm"
                           style={{border: '1px solid rgba(93, 122, 156, 0.9)', backgroundColor: 'rgba(93, 122, 156, 0.9)'}}>
@@ -389,178 +333,7 @@ export default function ApplicationsPage() {
         </div>
       )}
 
-      {selectedApp && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="rounded-2xl p-6 w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto" style={{border: '2px solid rgba(30, 40, 60, 0.7)', backgroundColor: 'rgba(30, 40, 60, 0.8)'}}>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                <span></span> 审核申请
-              </h2>
-              <button
-                onClick={() => setSelectedApp(null)}
-                className="text-white/60 hover:text-white text-2xl"
-              >
-                ×
-              </button>
-            </div>
-            
-            <div className="space-y-4">
-              <div className="rounded-xl p-4 space-y-3" style={{border: '1px solid rgba(93, 122, 156, 0.8)', backgroundColor: 'rgba(93, 122, 156, 0.8)'}}>
-                <div className="flex justify-between">
-                  <span className="text-white/60">游戏ID</span>
-                  <span className="text-white font-medium">{selectedApp.minecraft_id}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-white/60">年龄</span>
-                  <span className="text-white">{selectedApp.age || '未填写'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-white/60">联系方式</span>
-                  <span className="text-white">{selectedApp.contact}</span>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* 游戏经验相关 */}
-                <div className="rounded-lg p-4" style={{border: '1px solid rgba(93, 122, 156, 0.8)', backgroundColor: 'rgba(93, 122, 156, 0.8)'}}>
-                  <h3 className="text-lg font-bold text-white mb-3">游戏经验</h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-white/60">游戏时间</span>
-                      <span className="text-white">{selectedApp.play_time || 0} 个月</span>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* 个人信息相关 */}
-                <div className="rounded-lg p-4" style={{border: '1px solid rgba(93, 122, 156, 0.8)', backgroundColor: 'rgba(93, 122, 156, 0.8)'}}>
-                  <h3 className="text-lg font-bold text-white mb-3">个人信息</h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-white/60">性别</span>
-                      <span className="text-white">{selectedApp.gender || '未填写'}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-white/60">如何知道服务器</span>
-                      <span className="text-white">{selectedApp.how_found || '未填写'}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* 答题相关 */}
-              {selectedApp.quiz_category && (
-                <div className="rounded-lg p-4" style={{border: '1px solid rgba(93, 122, 156, 0.8)', backgroundColor: 'rgba(93, 122, 156, 0.8)'}}>
-                  <h3 className="text-lg font-bold text-white mb-3">答题信息</h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-white/60">答题类别</span>
-                      <span className="text-white">{selectedApp.quiz_category}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-white/60">答题得分</span>
-                      <span className="text-white">{selectedApp.quiz_score || 0} / {selectedApp.quiz_total || 0}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {/* 作品展示 */}
-              {selectedApp.work_files && selectedApp.work_files.length > 0 && (
-                <div className="rounded-lg p-4" style={{border: '1px solid rgba(93, 122, 156, 0.8)', backgroundColor: 'rgba(93, 122, 156, 0.8)'}}>
-                  <h3 className="text-lg font-bold text-white mb-3">玩家作品</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    {selectedApp.work_files.map((url, idx) => (
-                      <div key={idx} className="relative bg-gray-900 rounded-lg border border-gray-700 p-2">
-                        <img
-                          src={url}
-                          alt={`作品 ${idx + 1}`}
-                          className="w-full h-32 object-cover rounded"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
 
-              {/* 其他信息 */}
-              {selectedApp.server_experience || selectedApp.griefing_history || selectedApp.additional_info || (selectedApp.scenario_answers && Object.keys(selectedApp.scenario_answers).length > 0) && (
-                <div className="rounded-lg p-4" style={{border: '1px solid rgba(93, 122, 156, 0.8)', backgroundColor: 'rgba(93, 122, 156, 0.8)'}}>
-                  <h3 className="text-lg font-bold text-white mb-3">其他信息</h3>
-                  
-                  {/* 实景题答案 */}
-                  {selectedApp.scenario_answers && Object.keys(selectedApp.scenario_answers).length > 0 && (
-                    <div className="mb-3">
-                      <div className="text-white/60 mb-1">实景题答案</div>
-                      {Object.entries(selectedApp.scenario_answers).map(([key, value]: [string, string]) => (
-                        <div key={key} className="text-white text-sm mb-2 p-2 bg-gray-900 rounded">
-                          <span className="text-green-400">第{parseInt(key) + 1}题: </span>
-                          {value}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  
-                  {selectedApp.server_experience && (
-                    <div className="mb-3">
-                      <div className="text-white/60 mb-1">服务器经验</div>
-                      <div className="text-white text-sm">{selectedApp.server_experience}</div>
-                    </div>
-                  )}
-                  {selectedApp.griefing_history && (
-                    <div className="mb-3">
-                      <div className="text-white/60 mb-1">破坏行为历史</div>
-                      <div className="text-white text-sm">{selectedApp.griefing_history}</div>
-                    </div>
-                  )}
-                  {selectedApp.additional_info && (
-                    <div>
-                      <div className="text-white/60 mb-1">其他信息</div>
-                      <div className="text-white text-sm">{selectedApp.additional_info}</div>
-                    </div>
-                  )}
-                </div>
-              )}
-              
-              <div>
-                <label className="block text-white/60 text-sm mb-2 font-medium">审核备注</label>
-                <textarea
-                  value={reviewNote}
-                  onChange={(e) => setReviewNote(e.target.value)}
-                  placeholder="填写审核备注（可选）"
-                  rows={3}
-                  className="w-full rounded-xl px-4 py-3 text-white focus:outline-none resize-none"
-                  style={{border: '1px solid rgba(93, 122, 156, 0.9)', backgroundColor: 'rgba(93, 122, 156, 0.9)'}}
-                />
-              </div>
-            </div>
-            
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => setSelectedApp(null)}
-                className="flex-1 px-4 py-3 hover:bg-white/10 text-white rounded-xl transition-all"
-                style={{border: '1px solid rgba(93, 122, 156, 0.8)', backgroundColor: 'rgba(93, 122, 156, 0.5)'}}
-              >
-                取消
-              </button>
-              <button
-                onClick={() => handleReview(selectedApp.id, 'rejected')}
-                disabled={processing}
-                className={`flex-1 px-4 py-3 hover:bg-white/30 text-white rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2`}
-                style={{border: '1px solid rgba(93, 122, 156, 0.9)', backgroundColor: 'rgba(93, 122, 156, 0.9)'}}>
-                {processing ? '处理中...' : <><span></span> 拒绝</>}
-              </button>
-              <button
-                onClick={() => handleReview(selectedApp.id, 'approved')}
-                disabled={processing}
-                className={`flex-1 px-4 py-3 hover:bg-white/30 text-white rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2`}
-                style={{border: '1px solid rgba(93, 122, 156, 0.9)', backgroundColor: 'rgba(93, 122, 156, 0.9)'}}>
-                {processing ? '处理中...' : <><span></span> 通过</>}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {showBlacklistModal && blacklistTarget && (
         <BlacklistModal

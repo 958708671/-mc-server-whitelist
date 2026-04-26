@@ -436,6 +436,20 @@ export async function GET(
       );
     }
     
+    // 获取申请的作品文件
+    const workFiles = await sql`
+      SELECT photos, video, archive FROM application_files 
+      WHERE application_id = ${parseInt(id)}
+    `;
+    
+    if (workFiles.length > 0) {
+      result[0].work_files = {
+        photos: workFiles[0].photos || [],
+        video: workFiles[0].video || null,
+        archive: workFiles[0].archive || null
+      };
+    }
+    
     return NextResponse.json({
       success: true,
       data: result[0]

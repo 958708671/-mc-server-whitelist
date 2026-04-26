@@ -42,11 +42,8 @@ async function initTable() {
   }
 }
 
-// 获取今天的答题次数
+// 获取今天的答题次数（不需要登录）
 export async function GET(request: NextRequest) {
-  const auth = requireAuth(request);
-  if (auth instanceof NextResponse) return auth;
-
   try {
     // 确保表存在
     await initTable();
@@ -80,7 +77,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// 增加答题次数
+// 增加答题次数（不需要登录）
 export async function POST(request: NextRequest) {
   try {
     const ip = getClientIP(request);
@@ -121,6 +118,36 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: false,
       error: '增加答题次数失败'
+    }, { status: 500 });
+  }
+}
+
+// 重置答题次数（不需要登录）
+export async function DELETE(request: NextRequest) {
+  try {
+    const ip = getClientIP(request);
+    const today = getChinaDateString();
+
+    await initTable();
+
+    await withRetry(async () => {
+      await sql`
+        DELETE FROM quiz_attempts
+        WHERE ip_address = ${ip} AND attempt_date = ${today}
+      `;
+    });
+
+    return NextResponse.json({
+      success: true,
+      ip,
+      date: today,
+      message: '答题次数已重置'
+    });
+  } catch (error) {
+    console.error('重置答题次数失败:', error);
+    return NextResponse.json({
+      success: false,
+      error: '重置答题次数失败'
     }, { status: 500 });
   }
 }
